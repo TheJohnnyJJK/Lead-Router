@@ -1,0 +1,6 @@
+# Dev-only tooling - not needed to run the service, only to develop it.
+# pip install -r requirements.txt -r requirements-dev.txt
+-r requirements.txt
+ruff>=0.16
+mypy>=2.3
+types-PyYAML>=6.0

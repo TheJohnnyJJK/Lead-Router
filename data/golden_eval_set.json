@@ -1,0 +1,149 @@
+[
+  {
+    "id": "hot-01",
+    "lead": {"name": "Priya Shah", "email": "priya.shah@summithealth.com", "company": "Summit Health Network (7 clinics)", "phone": "(415) 555-0142", "message": "We manage 7 clinics and our current janitorial contract expires at the end of the month - we need a new vendor lined up to start by then.", "source": "web_form"},
+    "expected_tier": "hot",
+    "expected_owner": "sales-enterprise",
+    "note": "Multi-site + explicit expiring-contract urgency - textbook hot lead."
+  },
+  {
+    "id": "hot-02",
+    "lead": {"name": "Marcus Bennett", "email": "marcus@brightlineretail.com", "company": "Brightline Retail Group", "phone": "(312) 555-0110", "message": "Opening a new location next month across 4 stores and need nightly cleaning in place before we open. Can someone call this week?", "source": "referral"},
+    "expected_tier": "hot",
+    "expected_owner": "sales-enterprise",
+    "note": "Referral + multi-site + hard deadline."
+  },
+  {
+    "id": "hot-03",
+    "lead": {"name": "Elena Fischer", "email": "elena.fischer@pinnaclefm.com", "company": "Pinnacle Facilities Management", "phone": null, "message": "We're putting together an RFP for facilities cleaning across our portfolio of 9 sites. Deadline to respond is in 10 days.", "source": "cold_email"},
+    "expected_tier": "hot",
+    "expected_owner": "sales-enterprise",
+    "note": "Facilities-management portfolio account - the single highest-value account type."
+  },
+  {
+    "id": "warm-01",
+    "lead": {"name": "Grace Nguyen", "email": "grace@ridgelinedental.com", "company": "Ridgeline Dental", "phone": null, "message": "Looking into options for regular office cleaning for our clinic. No rush, just comparing a few providers.", "source": "web_form"},
+    "expected_tier": "warm",
+    "expected_owner": "sales-smb",
+    "note": "Single-site ICP fit, explicitly no urgency - fit without urgency."
+  },
+  {
+    "id": "warm-02",
+    "lead": {"name": "Owen Larsen", "email": "owen.larsen@thornburylaw.com", "company": "Thornbury Law Offices", "phone": null, "message": "We've been using another vendor but aren't thrilled - considering a switch for our office, nothing urgent though.", "source": "web_form"},
+    "expected_tier": "warm",
+    "expected_owner": "sales-smb",
+    "note": "TRAP: the word 'urgent' appears but is explicitly negated ('nothing urgent though'). The keyword-matching heuristic fallback misreads this as hot - this is the case that best demonstrates why the LLM scorer outperforms it."
+  },
+  {
+    "id": "warm-03",
+    "lead": {"name": "Fatima Haddad", "email": "fatima@keplerinsurance.com", "company": "Kepler Insurance Agency", "phone": "(212) 555-0199", "message": "Do you offer recurring cleaning contracts for a single office? Would like a quote when you have a chance.", "source": "web_form"},
+    "expected_tier": "warm",
+    "expected_owner": "sales-smb",
+    "note": "Single small commercial account, recurring intent, no urgency."
+  },
+  {
+    "id": "warm-04",
+    "lead": {"name": "Noah Kowalski", "email": "noah.k@gmail.com", "company": "Maple & Co. Studio", "phone": null, "message": "Referred by a friend at Summit Health - we run a small design studio and are unhappy with our current cleaners. Would like to switch soon.", "source": "referral"},
+    "expected_tier": "warm",
+    "expected_owner": "sales-smb",
+    "note": "TRAP: referral + 'soon' sounds exciting, but it's a small single-site studio, not an enterprise account - fit should cap it at warm, not hot."
+  },
+  {
+    "id": "cold-01",
+    "lead": {"name": "Aisha Bello", "email": "aisha.bello@yahoo.com", "company": null, "phone": null, "message": "Hi, I need my house cleaned before guests arrive next weekend, do you do residential?", "source": "web_form"},
+    "expected_tier": "cold",
+    "expected_owner": "nurture",
+    "note": "Residential, outside ICP, but a real person with real intent - nurture, not discard."
+  },
+  {
+    "id": "cold-02",
+    "lead": {"name": "Diego Ortiz", "email": "diego.ortiz@hotmail.com", "company": null, "phone": null, "message": "Looking for a one-time move-out clean for my apartment.", "source": "web_form"},
+    "expected_tier": "cold",
+    "expected_owner": "nurture",
+    "note": "One-off residential, no recurring potential."
+  },
+  {
+    "id": "cold-03",
+    "lead": {"name": "Yuki Tanaka", "email": "yuki.t@gmail.com", "company": null, "phone": null, "message": "Just curious what cleaning services generally cost, not sure if I need anything yet.", "source": "content_download"},
+    "expected_tier": "cold",
+    "expected_owner": "nurture",
+    "note": "Vague, no company, price-shopping - real but unqualified."
+  },
+  {
+    "id": "cold-04",
+    "lead": {"name": "Lena Cruz", "email": "lena.cruz@gmail.com", "company": null, "phone": null, "message": "Do you clean Airbnbs between guests? Just one unit.", "source": "web_form"},
+    "expected_tier": "cold",
+    "expected_owner": "nurture",
+    "note": "Single-unit short-term rental - outside recurring-commercial ICP."
+  },
+  {
+    "id": "spam-01",
+    "lead": {"name": "Chris Media", "email": "chris@growthmarketingsolutions.com", "company": "Growth Marketing Solutions", "phone": null, "message": "Hi, I noticed your website could use better SEO. We can boost your ranking - reply for a free audit.", "source": "cold_email"},
+    "expected_tier": "spam",
+    "expected_owner": "discard",
+    "note": "TRAP: has a company name and a business email domain, which could fool a naive 'has_company -> warm' rule - it's a vendor pitch, not a lead."
+  },
+  {
+    "id": "spam-02",
+    "lead": {"name": "SEO Experts", "email": "team@seoexperts.io", "company": "SEO Experts Inc", "phone": null, "message": "Grow your business with our guest post and link building service, low rates!", "source": "cold_email"},
+    "expected_tier": "spam",
+    "expected_owner": "discard",
+    "note": "Outbound vendor pitch, not an inbound need."
+  },
+  {
+    "id": "spam-03",
+    "lead": {"name": "Test User", "email": "test@test.com", "company": null, "phone": null, "message": "asdf", "source": "web_form"},
+    "expected_tier": "spam",
+    "expected_owner": "discard",
+    "note": "Empty/junk submission."
+  },
+  {
+    "id": "spam-04",
+    "lead": {"name": "A B", "email": "abc@gmail.com", "company": null, "phone": null, "message": "test test 123", "source": "web_form"},
+    "expected_tier": "spam",
+    "expected_owner": "discard",
+    "note": "QA/bot test submission."
+  },
+  {
+    "id": "edge-01",
+    "lead": {"name": "Tomás Reyes", "email": "tomas.reyes@cascadesd.org", "company": "Cascade School District", "phone": "(503) 555-0177", "message": "We have 12 school buildings and our board just approved budget for a new cleaning contract starting next semester. Need proposals within 3 weeks.", "source": "referral"},
+    "expected_tier": "hot",
+    "expected_owner": "sales-enterprise",
+    "note": "Large multi-site public-sector account, budget approved, real deadline - unambiguous hot despite unusual vertical (schools, not offices/clinics)."
+  },
+  {
+    "id": "edge-02",
+    "lead": {"name": "Casey Patel", "email": "casey.patel@harborviewmedical.com", "company": "Harborview Medical Plaza (multi-site)", "phone": null, "message": "Comparing vendors for our facilities, no timeline yet, just gathering information for now.", "source": "web_form"},
+    "expected_tier": "warm",
+    "expected_owner": "sales-smb",
+    "note": "TRAP: multi-site company name looks enterprise-scale, but the message explicitly states no urgency and early-stage research - fit is high but urgency is genuinely near zero, so this should land warm, not hot. Tests whether the scorer separates icp_fit_score from urgency_score correctly."
+  },
+  {
+    "id": "edge-03",
+    "lead": {"name": "Sam Bianchi", "email": "sam.bianchi@gmail.com", "company": "Union Square Office Portfolio", "phone": null, "message": "urgent urgent urgent need cleaners asap!!! best price???", "source": "cold_email"},
+    "expected_tier": "cold",
+    "expected_owner": "nurture",
+    "note": "TRAP: keyword-stuffed with every urgency word, but the content and tone read as low-quality/likely-spam-adjacent price-shopping with no real detail - a good scorer should weigh substance over keyword density; a naive keyword counter would misfire this as hot."
+  },
+  {
+    "id": "edge-04",
+    "lead": {"name": "Morgan Ng", "email": "morgan.ng@alcovecoworking.com", "company": "Alcove Coworking", "phone": "(646) 555-0133", "message": "Our current vendor just gave notice and stopped showing up - we need someone in here this week, single location, small space though.", "source": "web_form"},
+    "expected_tier": "warm",
+    "expected_owner": "sales-smb",
+    "note": "Genuine urgency but a single small site - should be warm with a high urgency_score, not bumped to hot on urgency alone. Tests that fit still gates the tier."
+  },
+  {
+    "id": "edge-05",
+    "lead": {"name": "Jordan Reyes", "email": "jordan@freshstartpeds.com", "company": "Fresh Start Pediatrics", "phone": null, "message": "   ", "source": "web_form"},
+    "expected_tier": "spam",
+    "expected_owner": "discard",
+    "note": "Whitespace-only message despite a plausible name/company/email - no real content to qualify on. A truly empty string is rejected earlier, at the API's own input validation (LeadIn requires min_length=1) - this case exists to prove the *business logic* (agent/graph.py's prefilter, which strips whitespace before measuring length) catches the 'technically not empty, but still nothing there' case that validation alone can't."
+  },
+  {
+    "id": "edge-06",
+    "lead": {"name": "Zoe Larsen", "email": "zoe.larsen@icloud.com", "company": null, "phone": null, "message": "unsubscribe me from this list immediately!!!", "source": "web_form"},
+    "expected_tier": "spam",
+    "expected_owner": "discard",
+    "note": "Not a lead at all - a complaint/unsubscribe request landing in the wrong form."
+  }
+]

@@ -1,0 +1,38 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# A realistic 2026 default: correctness + bugs + security + modernization,
+# not ruff's full rule set (which includes plenty of house-style opinions
+# that fight each other). S101 (assert) is disabled for tests below because
+# assert *is* the standard way to write a pytest assertion - it's only a
+# real risk in shipped application code, where an -O flag could strip it.
+select = ["E", "F", "I", "UP", "B", "S", "C4", "SIM", "PIE"]
+ignore = [
+  "S105", "S106",  # hardcoded-password checks - false-positive on our field named "password"-adjacent identifiers (none exist, kept off to avoid noise)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # assert is the correct tool in test files
+# `random` here generates fake demo data and picks a reproducible seed for
+# simulated history - never used for anything security-sensitive (no tokens,
+# no secrets, no auth). S311 exists to catch crypto misuse, not this.
+"data/synthetic_leads.py" = ["S311"]
+"scripts/seed_history.py" = ["S311"]
+# Generated HTML/CSS/JS template strings genuinely run long (URLs, inline
+# styles, template literals) - wrapping them hurts readability more than a
+# capped line length helps. Real Python control flow in this file still
+# follows the 100-char limit; only the template body is exempt.
+"dashboard/generate_dashboard.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "langgraph.*"
+ignore_missing_imports = true

@@ -1,0 +1,41 @@
+# Brings up n8n only - the FastAPI agent service (agent/main.py) is meant
+# to be run directly on the host with `uvicorn`, not containerized here,
+# so the workflow's HTTP Request node can reach it at host.docker.internal.
+#
+#   docker compose up -d n8n     # then open http://localhost:5678
+#
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"  # host:container - n8n's UI and webhook endpoints both live here
+    environment:
+      # SECURITY NOTE: this disables the "secure cookie" flag so n8n's login
+      # works over plain http on localhost. It is only safe because this is
+      # local development traffic that never leaves the machine - if this
+      # container is ever exposed beyond localhost (a real deployment,
+      # a tunnel, a shared dev box), put it behind HTTPS and remove this
+      # line so n8n enforces secure cookies again.
+      - N8N_SECURE_COOKIE=false
+      # Recent n8n versions block workflow expressions from reading {{$env.*}}
+      # by default (a reasonable default - env vars can hold secrets). The
+      # Slack notification nodes in n8n/lead-intake-workflow.json need it
+      # explicitly re-enabled to read SLACK_WEBHOOK_HOT/WARM below.
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      # ${...} here is docker compose substituting from a .env file in this
+      # same directory (see .env.example) - the same file the Python agent
+      # service reads, so both halves of the system share one source of secrets.
+      - SLACK_WEBHOOK_HOT=${SLACK_WEBHOOK_HOT:-}
+      - SLACK_WEBHOOK_WARM=${SLACK_WEBHOOK_WARM:-}
+    volumes:
+      # Named volume: n8n's own database/credentials/settings persist across
+      # `docker compose down` + `up` instead of resetting every time.
+      - n8n_data:/home/node/.n8n
+      # Bind mount: makes n8n/lead-intake-workflow.json visible inside the
+      # container at /workflows, so it can be imported from a file the repo
+      # already tracks instead of copy-pasting JSON through the browser.
+      - ./n8n:/workflows
+
+volumes:
+  n8n_data:

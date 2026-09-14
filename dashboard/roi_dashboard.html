@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian Facility Services — Lead Routing ROI</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#eef1ee; --ink:#1b211f; --ink-soft:#4b544f; --ink-faint:#7c847e;
+    --line:#c9d1cb; --line-soft:#dde3de; --accent:#1c6e63; --accent-ink:#0f3f38;
+    --tile:#e2e8e3; --grid:#d6ddd8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#12181a; --ink:#e9ede9; --ink-soft:#a3ada6; --ink-faint:#6f7973;
+      --line:#2b3533; --line-soft:#232d2b; --accent:#57bfae; --accent-ink:#8fd9cc;
+      --tile:#1a2220; --grid:#26312e;
+    }
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:"Public Sans",-apple-system,sans-serif;
+       line-height:1.55;margin:0;padding:48px 24px 80px}
+  .wrap{max-width:800px;margin:0 auto}
+  h1{font-family:"Source Serif 4",Georgia,serif;font-size:28px;margin:0 0 4px}
+  h2{font-family:"Source Serif 4",Georgia,serif;font-size:18px;margin:0 0 10px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.08em;
+           text-transform:uppercase;color:var(--ink-faint)}
+  .muted{color:var(--ink-soft);font-size:14px;margin:0 0 16px}
+  .card{border:1px solid var(--line);background:var(--tile);padding:20px 24px;margin:20px 0;border-radius:2px}
+
+  .hero-row{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:1px;background:var(--line);
+            border:1px solid var(--line);margin:24px 0}
+  .hero-row .tile{background:var(--tile);padding:18px 16px}
+  .hero-row .tile.primary{background:var(--paper)}
+  .tile .label{font-family:"IBM Plex Mono",monospace;font-size:11px;text-transform:uppercase;
+               letter-spacing:.06em;color:var(--ink-faint);margin-bottom:8px}
+  .tile .value{font-family:"Public Sans",sans-serif;font-weight:700;color:var(--accent-ink)}
+  .tile.primary .value{font-size:40px}
+  .tile:not(.primary) .value{font-size:26px}
+  .tile .sub{font-size:12px;color:var(--ink-soft);margin-top:6px}
+
+  .chart{width:100%;height:auto;overflow:visible}
+  .bar{fill:var(--accent)}
+  .bar:hover{fill:var(--accent-ink)}
+  .axis-label{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-faint)}
+
+  .tier-chart{width:100%;height:auto;margin-top:6px}
+  .seg-label{font-family:"IBM Plex Mono",monospace;font-size:11px;fill:#fff;font-weight:600}
+  .tier-legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--ink-soft)}
+  .tier-legend span.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+  .tooltip{position:fixed;pointer-events:none;background:var(--ink);color:var(--paper);
+           font-family:"IBM Plex Mono",monospace;font-size:12px;padding:6px 10px;border-radius:3px;
+           opacity:0;transform:translate(-50%,-120%);transition:opacity .1s;z-index:10;white-space:nowrap}
+  .tooltip.show{opacity:1}
+  .tooltip b{color:#fff}
+
+  .eval-table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  .eval-table th, .eval-table td{padding:8px 10px;border-bottom:1px solid var(--line-soft);text-align:left}
+  .eval-table th{font-family:"IBM Plex Mono",monospace;font-size:11px;text-transform:uppercase;
+                  color:var(--ink-faint)}
+  .eval-table td.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+  footer{margin-top:36px;color:var(--ink-faint);font-size:12px;border-top:1px solid var(--line);padding-top:16px}
+  .assumption{font-size:12px;color:var(--ink-faint);margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="eyebrow">Lead routing agent — ROI report</span>
+  <h1>Meridian Facility Services</h1>
+  <p class="muted">Automated inbound lead qualification, 60 days of live-shaped traffic. Generated 2026-09-14 23:32.</p>
+
+  <div class="hero-row">
+    <div class="tile primary">
+      <div class="label">Hours saved</div>
+      <div class="value">110.1</div>
+      <div class="sub">across 60 days, vs. manual triage — ~12.8 hrs/week</div>
+    </div>
+    <div class="tile">
+      <div class="label">Leads processed</div>
+      <div class="value">1,101</div>
+      <div class="sub">18.4 / day average</div>
+    </div>
+    <div class="tile">
+      <div class="label">Hot leads routed</div>
+      <div class="value">156</div>
+      <div class="sub">to sales-enterprise, instantly</div>
+    </div>
+    <div class="tile">
+      <div class="label">Avg decision time</div>
+      <div class="value">&lt;1<span style="font-size:16px">ms</span></div>
+      <div class="sub">vs. ~6 min manual</div>
+    </div>
+  </div>
+  <p class="assumption">Hours-saved assumes 6 minutes of human triage per inbound lead — edit MANUAL_MINUTES_PER_LEAD in dashboard/generate_dashboard.py to match a real client's actual process before presenting this number as fact.</p>
+
+  <div class="card">
+    <h2>Daily inbound volume — last 60 days</h2>
+    <p class="muted">Every bar is one calendar day. Weekend trickle is real, not a gap in the data.</p>
+    
+<svg viewBox="0 0 760 150" class="chart" role="img" aria-label="Daily inbound leads, last 60 days">
+  <g transform="translate(40,0)">
+    <line x1="0" y1="128.0" x2="720" y2="128.0" stroke="var(--grid)" stroke-width="1"/><text x="-8" y="131.0" text-anchor="end" class="axis-label">0</text><line x1="0" y1="69.0" x2="720" y2="69.0" stroke="var(--grid)" stroke-width="1"/><text x="-8" y="72.0" text-anchor="end" class="axis-label">19</text><line x1="0" y1="10.0" x2="720" y2="10.0" stroke="var(--grid)" stroke-width="1"/><text x="-8" y="13.0" text-anchor="end" class="axis-label">38</text>
+    <rect class="bar" x="2.00" y="53.47" width="8.00" height="74.53" rx="2" ry="2" data-day="2026-07-16" data-n="24"/><rect class="bar" x="14.00" y="16.21" width="8.00" height="111.79" rx="2" ry="2" data-day="2026-07-17" data-n="36"/><rect class="bar" x="26.00" y="115.58" width="8.00" height="12.42" rx="2" ry="2" data-day="2026-07-18" data-n="4"/><rect class="bar" x="38.00" y="121.79" width="8.00" height="6.21" rx="2" ry="2" data-day="2026-07-19" data-n="2"/><rect class="bar" x="50.00" y="37.95" width="8.00" height="90.05" rx="2" ry="2" data-day="2026-07-20" data-n="29"/><rect class="bar" x="62.00" y="62.79" width="8.00" height="65.21" rx="2" ry="2" data-day="2026-07-21" data-n="21"/><rect class="bar" x="74.00" y="16.21" width="8.00" height="111.79" rx="2" ry="2" data-day="2026-07-22" data-n="36"/><rect class="bar" x="86.00" y="25.53" width="8.00" height="102.47" rx="2" ry="2" data-day="2026-07-23" data-n="33"/><rect class="bar" x="98.00" y="16.21" width="8.00" height="111.79" rx="2" ry="2" data-day="2026-07-24" data-n="36"/><rect class="bar" x="110.00" y="112.47" width="8.00" height="15.53" rx="2" ry="2" data-day="2026-07-25" data-n="5"/><rect class="bar" x="122.00" y="115.58" width="8.00" height="12.42" rx="2" ry="2" data-day="2026-07-26" data-n="4"/><rect class="bar" x="134.00" y="78.32" width="8.00" height="49.68" rx="2" ry="2" data-day="2026-07-27" data-n="16"/><rect class="bar" x="146.00" y="78.32" width="8.00" height="49.68" rx="2" ry="2" data-day="2026-07-28" data-n="16"/><rect class="bar" x="158.00" y="34.84" width="8.00" height="93.16" rx="2" ry="2" data-day="2026-07-29" data-n="30"/><rect class="bar" x="170.00" y="37.95" width="8.00" height="90.05" rx="2" ry="2" data-day="2026-07-30" data-n="29"/><rect class="bar" x="182.00" y="10.00" width="8.00" height="118.00" rx="2" ry="2" data-day="2026-07-31" data-n="38"/><rect class="bar" x="194.00" y="115.58" width="8.00" height="12.42" rx="2" ry="2" data-day="2026-08-01" data-n="4"/><rect class="bar" x="206.00" y="115.58" width="8.00" height="12.42" rx="2" ry="2" data-day="2026-08-02" data-n="4"/><rect class="bar" x="218.00" y="81.42" width="8.00" height="46.58" rx="2" ry="2" data-day="2026-08-03" data-n="15"/><rect class="bar" x="230.00" y="22.42" width="8.00" height="105.58" rx="2" ry="2" data-day="2026-08-04" data-n="34"/><rect class="bar" x="242.00" y="25.53" width="8.00" height="102.47" rx="2" ry="2" data-day="2026-08-05" data-n="33"/><rect class="bar" x="254.00" y="59.68" width="8.00" height="68.32" rx="2" ry="2" data-day="2026-08-06" data-n="22"/><rect class="bar" x="266.00" y="69.00" width="8.00" height="59.00" rx="2" ry="2" data-day="2026-08-07" data-n="19"/><rect class="bar" x="278.00" y="121.79" width="8.00" height="6.21" rx="2" ry="2" data-day="2026-08-08" data-n="2"/><rect class="bar" x="290.00" y="118.68" width="8.00" height="9.32" rx="2" ry="2" data-day="2026-08-09" data-n="3"/><rect class="bar" x="302.00" y="78.32" width="8.00" height="49.68" rx="2" ry="2" data-day="2026-08-10" data-n="16"/><rect class="bar" x="314.00" y="75.21" width="8.00" height="52.79" rx="2" ry="2" data-day="2026-08-11" data-n="17"/><rect class="bar" x="326.00" y="78.32" width="8.00" height="49.68" rx="2" ry="2" data-day="2026-08-12" data-n="16"/><rect class="bar" x="338.00" y="10.00" width="8.00" height="118.00" rx="2" ry="2" data-day="2026-08-13" data-n="38"/><rect class="bar" x="350.00" y="69.00" width="8.00" height="59.00" rx="2" ry="2" data-day="2026-08-14" data-n="19"/><rect class="bar" x="362.00" y="112.47" width="8.00" height="15.53" rx="2" ry="2" data-day="2026-08-15" data-n="5"/><rect class="bar" x="374.00" y="124.89" width="8.00" height="3.11" rx="2" ry="2" data-day="2026-08-16" data-n="1"/><rect class="bar" x="386.00" y="81.42" width="8.00" height="46.58" rx="2" ry="2" data-day="2026-08-17" data-n="15"/><rect class="bar" x="398.00" y="84.53" width="8.00" height="43.47" rx="2" ry="2" data-day="2026-08-18" data-n="14"/><rect class="bar" x="410.00" y="84.53" width="8.00" height="43.47" rx="2" ry="2" data-day="2026-08-19" data-n="14"/><rect class="bar" x="422.00" y="75.21" width="8.00" height="52.79" rx="2" ry="2" data-day="2026-08-20" data-n="17"/><rect class="bar" x="434.00" y="75.21" width="8.00" height="52.79" rx="2" ry="2" data-day="2026-08-21" data-n="17"/><rect class="bar" x="446.00" y="118.68" width="8.00" height="9.32" rx="2" ry="2" data-day="2026-08-22" data-n="3"/><rect class="bar" x="458.00" y="121.79" width="8.00" height="6.21" rx="2" ry="2" data-day="2026-08-23" data-n="2"/><rect class="bar" x="470.00" y="62.79" width="8.00" height="65.21" rx="2" ry="2" data-day="2026-08-24" data-n="21"/><rect class="bar" x="482.00" y="62.79" width="8.00" height="65.21" rx="2" ry="2" data-day="2026-08-25" data-n="21"/><rect class="bar" x="494.00" y="28.63" width="8.00" height="99.37" rx="2" ry="2" data-day="2026-08-26" data-n="32"/><rect class="bar" x="506.00" y="59.68" width="8.00" height="68.32" rx="2" ry="2" data-day="2026-08-27" data-n="22"/><rect class="bar" x="518.00" y="75.21" width="8.00" height="52.79" rx="2" ry="2" data-day="2026-08-28" data-n="17"/><rect class="bar" x="530.00" y="121.79" width="8.00" height="6.21" rx="2" ry="2" data-day="2026-08-29" data-n="2"/><rect class="bar" x="542.00" y="118.68" width="8.00" height="9.32" rx="2" ry="2" data-day="2026-08-30" data-n="3"/><rect class="bar" x="554.00" y="25.53" width="8.00" height="102.47" rx="2" ry="2" data-day="2026-08-31" data-n="33"/><rect class="bar" x="566.00" y="65.89" width="8.00" height="62.11" rx="2" ry="2" data-day="2026-09-01" data-n="20"/><rect class="bar" x="578.00" y="56.58" width="8.00" height="71.42" rx="2" ry="2" data-day="2026-09-02" data-n="23"/><rect class="bar" x="590.00" y="22.42" width="8.00" height="105.58" rx="2" ry="2" data-day="2026-09-03" data-n="34"/><rect class="bar" x="602.00" y="65.89" width="8.00" height="62.11" rx="2" ry="2" data-day="2026-09-04" data-n="20"/><rect class="bar" x="614.00" y="124.89" width="8.00" height="3.11" rx="2" ry="2" data-day="2026-09-05" data-n="1"/><rect class="bar" x="626.00" y="121.79" width="8.00" height="6.21" rx="2" ry="2" data-day="2026-09-06" data-n="2"/><rect class="bar" x="638.00" y="31.74" width="8.00" height="96.26" rx="2" ry="2" data-day="2026-09-07" data-n="31"/><rect class="bar" x="650.00" y="13.11" width="8.00" height="114.89" rx="2" ry="2" data-day="2026-09-08" data-n="37"/><rect class="bar" x="662.00" y="37.95" width="8.00" height="90.05" rx="2" ry="2" data-day="2026-09-09" data-n="29"/><rect class="bar" x="674.00" y="16.21" width="8.00" height="111.79" rx="2" ry="2" data-day="2026-09-10" data-n="36"/><rect class="bar" x="686.00" y="56.58" width="8.00" height="71.42" rx="2" ry="2" data-day="2026-09-11" data-n="23"/><rect class="bar" x="698.00" y="121.79" width="8.00" height="6.21" rx="2" ry="2" data-day="2026-09-12" data-n="2"/><rect class="bar" x="710.00" y="118.68" width="8.00" height="9.32" rx="2" ry="2" data-day="2026-09-13" data-n="3"/>
+  </g>
+</svg>
+  </div>
+
+  <div class="card">
+    <h2>Where leads landed</h2>
+    <p class="muted">Scored entirely by the heuristic fallback - no ANTHROPIC_API_KEY was set during this run. Add one to route ambiguous cases to Claude; see eval results below for exactly how much that's expected to matter.</p>
+    <svg viewBox="0 0 720 28" class="tier-chart" role="img" aria-label="Lead tier distribution"><g class="tier-seg" data-tier="Hot" data-n="156" data-pct="14.2"><rect x="0.00" y="0" width="100.02" height="28" rx="2" ry="2" fill="#0f4a42"/><text x="50.01" y="18.0" text-anchor="middle" class="seg-label">Hot 14%</text></g><g class="tier-seg" data-tier="Warm" data-n="215" data-pct="19.5"><rect x="102.02" y="0" width="138.60" height="28" rx="2" ry="2" fill="#1c6e63"/><text x="171.32" y="18.0" text-anchor="middle" class="seg-label">Warm 20%</text></g><g class="tier-seg" data-tier="Cold" data-n="460" data-pct="41.8"><rect x="242.62" y="0" width="298.82" height="28" rx="2" ry="2" fill="#7fada3"/><text x="392.02" y="18.0" text-anchor="middle" class="seg-label">Cold 42%</text></g><g class="tier-seg" data-tier="Spam" data-n="270" data-pct="24.5"><rect x="543.43" y="0" width="174.57" height="28" rx="2" ry="2" fill="#c9d0cb"/><text x="630.72" y="18.0" text-anchor="middle" class="seg-label">Spam 25%</text></g></svg>
+    <div class="tier-legend">
+      <span><span class="sw" style="background:#0f4a42"></span>Hot — 156 (14.2%)</span><span><span class="sw" style="background:#1c6e63"></span>Warm — 215 (19.5%)</span><span><span class="sw" style="background:#7fada3"></span>Cold — 460 (41.8%)</span><span><span class="sw" style="background:#c9d0cb"></span>Spam — 270 (24.5%)</span>
+    </div>
+  </div>
+
+    <div class="card">
+      <h2>Eval harness result</h2>
+      <p class="muted">Graded against data/golden_eval_set.json - see eval/run_eval.py for the full miss-by-miss report.</p>
+      <table class="eval-table">
+        <thead><tr><th>Scorer</th><th>Accuracy</th><th>Misses</th></tr></thead>
+        <tbody><tr><td>heuristic</td><td class="num">71.4%</td><td class="num">6 of 21</td></tr></tbody>
+      </table>
+    </div>
+
+  <footer>
+    Generated by dashboard/generate_dashboard.py from lead_router.db. Every figure above is computed from stored records — none are hand-typed.
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<script>
+  const tip = document.getElementById('tooltip');
+  const tipBold = document.createElement('b');
+  const tipRest = document.createTextNode('');
+  tip.append(tipBold, tipRest);
+
+  // Every value below (day, count, tier name, percentage) is generated
+  // server-side from fixed labels and numbers - never raw lead text - so
+  // there's nothing unsafe here today. It's still built with textContent
+  // rather than innerHTML on principle: a tooltip is exactly the kind of
+  // place someone later adds a real field (a company name, a message
+  // snippet) without thinking about it, and textContent means that change
+  // can never become an HTML-injection bug by accident.
+  function showTip(x, y, bold, rest) {
+    tipBold.textContent = bold;
+    tipRest.textContent = rest;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+    tip.classList.add('show');
+  }
+  function hideTip() { tip.classList.remove('show'); }
+  function followPointer(e) { tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px'; }
+
+  document.querySelectorAll('.bar').forEach(bar => {
+    bar.addEventListener('pointerenter', e => {
+      showTip(e.clientX, e.clientY, bar.dataset.n, ` leads · ${bar.dataset.day}`);
+    });
+    bar.addEventListener('pointermove', followPointer);
+    bar.addEventListener('pointerleave', hideTip);
+  });
+  document.querySelectorAll('.tier-seg').forEach(seg => {
+    seg.addEventListener('pointerenter', e => {
+      showTip(e.clientX, e.clientY, seg.dataset.tier, `: ${seg.dataset.n} leads (${seg.dataset.pct}%)`);
+    });
+    seg.addEventListener('pointermove', followPointer);
+    seg.addEventListener('pointerleave', hideTip);
+  });
+</script>
+</body>
+</html>

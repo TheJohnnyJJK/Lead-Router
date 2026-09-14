@@ -1,0 +1,190 @@
+{
+  "name": "Lead Intake → Qualify → Route",
+  "nodes": [
+    {
+      "id": "webhook-intake",
+      "name": "Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-40, 260],
+      "webhookId": "lead-intake",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "notes": "Entry point. This is what a real form/CRM webhook would POST to instead of data/synthetic_leads.py. responseMode is 'responseNode' rather than n8n's default 'immediately' - that's what lets the 'Respond to Webhook' node further down send back the agent's actual qualification result instead of an empty 200.",
+      "notesInFlow": true
+    },
+    {
+      "id": "http-qualify",
+      "name": "Qualify Lead (agent service)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 260],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/qualify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "notes": "Calls the FastAPI agent service (agent/main.py's POST /qualify) and gets back the full qualification decision. host.docker.internal is how a container reaches a service running on the host machine - swap it for a real hostname once this deploys alongside the client's actual stack, and note that if AGENT_API_KEY is set on the agent service (see agent/security.py), this node also needs an X-API-Key header added under Options > Headers with the matching value - deliberately not hardcoded here so a real secret never ends up committed in this file.",
+      "notesInFlow": true
+    },
+    {
+      "id": "respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 140],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "notes": "Sends the agent's qualification result straight back to whatever called the webhook - runs in parallel with 'Route by Tier' below, off the same 'Qualify Lead' output, so the caller doesn't have to wait for the notification branch to finish.",
+      "notesInFlow": true
+    },
+    {
+      "id": "switch-tier",
+      "name": "Route by Tier",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [480, 380],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "hot", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "outputKey": "hot"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "warm", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "outputKey": "warm"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "cold", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "outputKey": "cold"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "spam", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "outputKey": "spam"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Four rules, checked top to bottom against the agent's `tier` field (hot/warm/cold/spam - see agent/schema.py's Tier type), one output per match. Each output wire below goes to its own placeholder Set node - swap those for the client's real Slack/CRM/marketing-automation nodes.",
+      "notesInFlow": true
+    },
+    {
+      "id": "notify-hot",
+      "name": "Slack: #hot-leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_HOT }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"text\": \":fire: Hot lead — \" + $json.name + \" (\" + ($json.company || \"no company given\") + \")\\n\" + $json.reasoning + \"\\n\" + $json.email + ($json.phone ? \" · \" + $json.phone : \"\") } }}",
+        "options": {}
+      },
+      "notes": "REAL, not a placeholder - posts to whatever Slack Incoming Webhook URL is set as SLACK_WEBHOOK_HOT (see .env.example / docker-compose.yml). Create one in under 2 minutes at https://api.slack.com/apps > your app > Incoming Webhooks. Until that env var is set, this node will fail visibly in n8n's execution log rather than silently doing nothing - that's the signal setup isn't finished yet.",
+      "notesInFlow": true
+    },
+    {
+      "id": "notify-warm",
+      "name": "Slack: #sales-smb",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 260],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_WARM }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"text\": \"New lead for sales-smb — \" + $json.name + \" (\" + ($json.company || \"no company given\") + \")\\n\" + $json.reasoning + \"\\n\" + $json.email } }}",
+        "options": {}
+      },
+      "notes": "REAL - same pattern as the hot-lead node, posting to a separate SLACK_WEBHOOK_WARM URL (can be the same channel or a different one - your call). Swap for a real CRM-write node instead if the client's SMB pipeline lives in a CRM rather than Slack.",
+      "notesInFlow": true
+    },
+    {
+      "id": "notify-cold",
+      "name": "Notify: nurture sequence (placeholder)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [760, 420],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"name": "notification", "type": "string", "value": "=Replace this Set node with a real marketing-automation trigger: enroll {{ $json.email }} in the nurture sequence."}
+          ]
+        }
+      },
+      "notes": "PLACEHOLDER - swap for a real marketing-automation enrollment call (Mailchimp, HubSpot, etc.).",
+      "notesInFlow": true
+    },
+    {
+      "id": "notify-spam",
+      "name": "Discard: log only",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [760, 580],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"name": "notification", "type": "string", "value": "=No action - logged in the agent's audit trail via /qualify. Nothing sent downstream."}
+          ]
+        }
+      },
+      "notes": "Deliberately a dead end, not a placeholder to fill in - spam is already fully handled by the agent's own audit trail (agent/store.py). Nothing needs to happen here.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Lead Webhook": {
+      "main": [[{"node": "Qualify Lead (agent service)", "type": "main", "index": 0}]]
+    },
+    "Qualify Lead (agent service)": {
+      "main": [[
+        {"node": "Respond to Webhook", "type": "main", "index": 0},
+        {"node": "Route by Tier", "type": "main", "index": 0}
+      ]]
+    },
+    "Route by Tier": {
+      "main": [
+        [{"node": "Notify: Slack #hot-leads (placeholder)", "type": "main", "index": 0}],
+        [{"node": "Notify: SMB sales queue (placeholder)", "type": "main", "index": 0}],
+        [{"node": "Notify: nurture sequence (placeholder)", "type": "main", "index": 0}],
+        [{"node": "Discard: log only", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "pinData": {}
+}

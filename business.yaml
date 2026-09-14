@@ -1,0 +1,124 @@
+# ============================================================================
+# Point this whole agent at a different business by editing THIS FILE.
+# No Python, no code changes - agent/icp.py loads it at startup and every
+# other file (the LLM prompt, the offline fallback, the eval set) inherits
+# whatever you write here.
+#
+# Secrets (Slack webhook URLs, API keys) do NOT go in this file - they go in
+# .env, so this file stays safe to hand to a client or commit to git.
+# ============================================================================
+
+business_name: "Meridian Facility Services"
+
+# Written in plain English - this gets sent directly to Claude as part of
+# its instructions, so write it exactly like you're briefing a new hire on
+# their first day: who's a real customer, who isn't, and what makes an
+# account worth chasing hard vs. worth ignoring.
+ideal_customer: |
+  Meridian Facility Services provides commercial cleaning and facilities
+  maintenance (janitorial, floor care, window cleaning, light maintenance)
+  to businesses - not homeowners. The ideal customer:
+
+  - Operates one or more commercial sites: offices, medical/dental clinics,
+    retail chains, schools, light-industrial or warehouse space.
+  - Wants a recurring contract (nightly/weekly cleaning), not a single visit.
+  - Multi-location accounts and facilities-management companies are the
+    highest-value tier - they turn into large recurring contracts.
+  - Has some urgency signal: a start date, an expiring contract with their
+    current vendor, a compliance/inspection deadline, or a new site opening.
+
+  Explicitly NOT a fit: residential/home cleaning requests, one-off single
+  small jobs with no recurring potential, and general "handyman" requests
+  outside cleaning/facilities scope - these are real people, just not this
+  business's customer, and should be routed to nurture rather than discarded
+  outright unless there's no contact information at all.
+
+  Not a lead at all: cold outbound sales pitches from other vendors (SEO
+  services, "grow your business" spam, unrelated software sales), completely
+  empty or test submissions, and messages with no discernible business intent.
+
+# The rule for sorting every inbound message into exactly one tier. Keep the
+# four tier names (hot/warm/cold/spam) and the "-> suggested_owner:" lines as
+# they are - graph.py and the rest of the pipeline expect those four values
+# back. Rewrite everything else for your business's actual criteria.
+routing_rules: |
+  Classify every inbound message into exactly one tier:
+
+  - hot: multi-site or facilities-management account, OR single large
+    commercial site, WITH a clear urgency signal (start date, contract
+    expiring, new location opening, inspection/compliance deadline).
+    -> suggested_owner: sales-enterprise
+
+  - warm: single commercial site, genuine recurring-cleaning need, but no
+    strong urgency signal, or urgency present but the account is small.
+    -> suggested_owner: sales-smb
+
+  - cold: residential requests, very small one-off jobs, or vague inquiries
+    from a real person that don't fit the ICP but aren't spam.
+    -> suggested_owner: nurture
+
+  - spam: vendor pitches, SEO/marketing solicitations, empty or nonsensical
+    submissions, anything with no genuine cleaning/facilities need.
+    -> suggested_owner: discard
+
+  icp_fit_score reflects how well the account matches the ICP (company type,
+  size, multi-site potential) independent of urgency. urgency_score reflects
+  time pressure independent of fit. A hot lead needs both to be meaningfully
+  non-zero; a warm lead can have high fit but low urgency, or vice versa.
+  confidence should be lower when the message is short, ambiguous, or missing
+  a company name - don't manufacture certainty the message doesn't support.
+
+# Only used as a fallback when no ANTHROPIC_API_KEY is set - simple keyword
+# matching instead of real judgment. Still worth tailoring to your business's
+# actual language (what your real urgent customers say, what your real spam
+# looks like), since the eval harness (eval/run_eval.py) grades this path too.
+keywords:
+  hot:
+    - "multiple locations"
+    - "multi-site"
+    - "multi site"
+    - "several locations"
+    - "facilities management"
+    - "rfp"
+    - "request for proposal"
+    - "portfolio of"
+    - "expiring contract"
+    - "contract is up"
+    - "new location opening"
+    - "start next week"
+    - "start this month"
+    - "inspection"
+    - "compliance deadline"
+    - "asap"
+    - "urgent"
+  residential:
+    - "my house"
+    - "my home"
+    - "my apartment"
+    - "residential"
+    - "one-time clean"
+    - "move-out clean"
+    - "move out clean"
+    - "airbnb"
+  spam:
+    - "seo"
+    - "backlink"
+    - "increase your ranking"
+    - "grow your business"
+    - "web design services"
+    - "link building"
+    - "guest post"
+    - "crypto"
+    - "unsubscribe"
+    - "test test"
+    - "asdf"
+    - "lorem ipsum"
+
+free_email_domains:
+  - "gmail.com"
+  - "yahoo.com"
+  - "hotmail.com"
+  - "outlook.com"
+  - "icloud.com"
+  - "aol.com"
+  - "protonmail.com"

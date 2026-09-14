@@ -1,0 +1,548 @@
+<!doctype html>
+<title>Under the Hood</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#eef1ee; --ink:#1b211f; --ink-soft:#4b544f; --ink-faint:#7c847e;
+    --line:#c9d1cb; --line-soft:#dde3de; --accent:#1c6e63; --accent-ink:#0f3f38;
+    --tile:#e2e8e3; --built:#8a6a1f; --built-bg:#f1e6c8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#12181a; --ink:#e9ede9; --ink-soft:#a3ada6; --ink-faint:#6f7973;
+      --line:#2b3533; --line-soft:#232d2b; --accent:#57bfae; --accent-ink:#8fd9cc;
+      --tile:#1a2220; --built:#e3c369; --built-bg:#332a12;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#12181a; --ink:#e9ede9; --ink-soft:#a3ada6; --ink-faint:#6f7973;
+    --line:#2b3533; --line-soft:#232d2b; --accent:#57bfae; --accent-ink:#8fd9cc;
+    --tile:#1a2220; --built:#e3c369; --built-bg:#332a12;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--paper);color:var(--ink);font-family:"Public Sans",-apple-system,sans-serif;
+       line-height:1.6;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--accent);color:var(--paper)}
+  .wrap{max-width:860px;margin:0 auto;padding:64px 28px 120px}
+  h1,h2,h3{font-family:"Source Serif 4",Georgia,serif;text-wrap:balance;color:var(--ink);font-weight:600}
+  a{color:var(--accent-ink)}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.09em;
+           text-transform:uppercase;color:var(--ink-faint)}
+  header{margin-bottom:20px}
+  header .eyebrow{margin-bottom:14px}
+  h1.title{font-size:clamp(32px,5vw,44px);line-height:1.1;margin:0 0 16px;letter-spacing:-.01em}
+  .dek{font-size:17px;color:var(--ink-soft);max-width:66ch;margin:0 0 8px}
+  .dek a{text-decoration-color:var(--line)}
+  .legend{font-size:13px;color:var(--ink-faint);margin:18px 0 8px;font-family:"IBM Plex Mono",monospace}
+
+  hr.rule{border:0;border-top:1px solid var(--line);margin:8px 0 0}
+
+  .project{padding:40px 0 8px;border-top:1px solid var(--line-soft)}
+  .project:first-of-type{border-top:2px solid var(--line)}
+  .phead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .pnum{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;color:var(--accent-ink)}
+  .pcat{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+        color:var(--ink-faint);border:1px solid var(--line);padding:2px 8px;border-radius:2px}
+  .built{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;
+         color:var(--built);background:var(--built-bg);padding:2px 9px;border-radius:2px;font-weight:600}
+  h2.ptitle{font-size:23px;margin:10px 0 20px}
+
+  .block{margin:20px 0}
+  .block h3{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+            color:var(--ink-faint);font-weight:600;margin:0 0 8px}
+  .block p{margin:0;color:var(--ink-soft);max-width:68ch;font-size:15px}
+  .block p a{color:var(--ink-soft);text-decoration-color:var(--line-soft)}
+
+  figure.dg{margin:14px 0 4px}
+  svg.dg-svg{width:100%;height:auto;display:block;color:var(--ink)}
+  svg.dg-svg text{font-family:"IBM Plex Mono",monospace;font-size:12px;fill:currentColor}
+  svg.dg-svg .box{fill:var(--tile);stroke:currentColor;stroke-width:1.3}
+  svg.dg-svg .box.accent{fill:var(--accent);stroke:var(--accent)}
+  svg.dg-svg .box.reject{fill:var(--paper);stroke:currentColor;stroke-width:1;stroke-dasharray:3 3;opacity:.75}
+  svg.dg-svg .lbl{text-anchor:middle}
+  svg.dg-svg .lbl.on-accent{fill:#fff}
+  svg.dg-svg .edge{stroke:currentColor;stroke-width:1.3;fill:none}
+  svg.dg-svg .edge.dashed{stroke-dasharray:4 3;opacity:.8}
+  svg.dg-svg .elabel{font-size:10px;fill:var(--ink-faint);text-anchor:middle}
+  figcaption.cap{font-size:13px;color:var(--ink-faint);margin-top:10px;max-width:70ch}
+
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--ink-faint);font-size:13px}
+
+  @media (max-width:640px){ .wrap{padding:44px 18px 90px} }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">Companion to Proof of Work</span>
+    <h1 class="title">Under the Hood</h1>
+    <p class="dek">The <a href="https://claude.ai/code/artifact/02b489c1-763f-4138-bbd0-020e7d0a544e">Proof of Work</a> report named ten projects and the hiring signal behind each one. This page is the other half: for every project, <b>why</b> it earns a place in fewer than three sentences, and <b>how</b> — the actual architecture, named tools included — as a diagram instead of a paragraph.</p>
+    <p class="legend">■ tile = a component you build or run &nbsp;·&nbsp; ■ teal = the one mechanism the project's value hinges on</p>
+  </header>
+
+  <hr class="rule">
+
+  <!-- 01 — LEAD ROUTER (BUILT) -->
+  <div class="project">
+    <div class="phead">
+      <span class="pnum">01</span>
+      <span class="pcat">Operations</span>
+      <span class="built">✓ Built — lead-router/ in this workspace</span>
+    </div>
+    <h2 class="ptitle">A digital employee with a real P&amp;L</h2>
+
+    <div class="block">
+      <h3>Why</h3>
+      <p>This is the actual job: StepStone runs 200+ production workflows on n8n, and turning one messy process into hours-and-dollars-saved is what an automation hire is for. This is the one project on the list that's actually built, tested, and running — not a sketch.</p>
+    </div>
+
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 820 220" role="img" aria-label="A lead arrives via an n8n webhook, is qualified by a FastAPI service running a LangGraph pipeline that either shortcuts obvious spam for free or scores real leads with Claude or a heuristic fallback, then persists to SQLite.">
+          <defs><marker id="a1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <g class="box"><rect class="box" x="0" y="88" width="96" height="44" rx="6"/></g>
+          <text class="lbl" x="48" y="106"><tspan x="48" dy="0">n8n</tspan><tspan x="48" dy="14">webhook</tspan></text>
+
+          <rect class="box" x="126" y="88" width="104" height="44" rx="6"/>
+          <text class="lbl" x="178" y="106"><tspan x="178" dy="0">FastAPI</tspan><tspan x="178" dy="14">/qualify</tspan></text>
+
+          <rect class="box" x="260" y="88" width="104" height="44" rx="6"/>
+          <text class="lbl" x="312" y="106"><tspan x="312" dy="0">LangGraph</tspan><tspan x="312" dy="14">enrich</tspan></text>
+
+          <rect class="box" x="394" y="88" width="104" height="44" rx="6" stroke-dasharray="3 3"/>
+          <text class="lbl" x="446" y="106"><tspan x="446" dy="0">prefilter:</tspan><tspan x="446" dy="14">spam?</tspan></text>
+
+          <rect class="box accent" x="548" y="14" width="150" height="44" rx="6"/>
+          <text class="lbl on-accent" x="623" y="32"><tspan x="623" dy="0">score:</tspan><tspan x="623" dy="14">Claude / heuristic</tspan></text>
+
+          <rect class="box" x="548" y="164" width="150" height="44" rx="6"/>
+          <text class="lbl" x="623" y="182"><tspan x="623" dy="0">shortcut:</tspan><tspan x="623" dy="14">spam ($0 cost)</tspan></text>
+
+          <rect class="box" x="728" y="88" width="90" height="44" rx="6"/>
+          <text class="lbl" x="773" y="106"><tspan x="773" dy="0">persist</tspan><tspan x="773" dy="14">SQLite</tspan></text>
+
+          <line class="edge" x1="96" y1="110" x2="122" y2="110" marker-end="url(#a1)"/>
+          <line class="edge" x1="230" y1="110" x2="256" y2="110" marker-end="url(#a1)"/>
+          <line class="edge" x1="364" y1="110" x2="390" y2="110" marker-end="url(#a1)"/>
+          <line class="edge" x1="498" y1="103" x2="544" y2="45" marker-end="url(#a1)"/>
+          <text class="elabel" x="510" y="70">no (real lead)</text>
+          <line class="edge" x1="498" y1="117" x2="544" y2="175" marker-end="url(#a1)"/>
+          <text class="elabel" x="510" y="150">yes</text>
+          <line class="edge" x1="698" y1="45" x2="724" y2="100" marker-end="url(#a1)"/>
+          <line class="edge" x1="698" y1="175" x2="724" y2="120" marker-end="url(#a1)"/>
+        </svg>
+        <figcaption class="cap">The teal box is the whole cost story: a prefilter node checks for empty/spam messages before anything reaches an LLM, so the free path handles roughly a quarter of real traffic. Everything persists to SQLite, which n8n then reads to route by tier to Slack, a CRM, or a nurture sequence.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 02 — EVAL HARNESS -->
+  <div class="project">
+    <div class="phead"><span class="pnum">02</span><span class="pcat">Evaluation</span></div>
+    <h2 class="ptitle">An agent reliability harness</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>"The eval step is what separates a senior-signal portfolio from a junior one" — and almost nobody ships one. tau-bench's pass^k metric (success rate across repeated trials, not best-of-k) is the field's own answer to "does it actually work," not "did it work once."</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 820 220" role="img" aria-label="A golden eval set is graded through a scorer function, compared against expected labels to build a confusion matrix and accuracy figures, then written to results.json for the dashboard.">
+          <defs><marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="58" width="110" height="44" rx="6"/>
+          <text class="lbl" x="55" y="76"><tspan x="55" dy="0">golden_eval_</tspan><tspan x="55" dy="14">set.json</tspan></text>
+
+          <rect class="box" x="150" y="58" width="90" height="44" rx="6"/>
+          <text class="lbl" x="195" y="84">grade()</text>
+
+          <rect class="box" x="280" y="58" width="140" height="44" rx="6"/>
+          <text class="lbl" x="350" y="76"><tspan x="350" dy="0">scorer:</tspan><tspan x="350" dy="14">heuristic / LLM</tspan></text>
+
+          <rect class="box accent" x="460" y="58" width="150" height="44" rx="6"/>
+          <text class="lbl on-accent" x="535" y="76"><tspan x="535" dy="0">compare vs</tspan><tspan x="535" dy="14">expected_tier</tspan></text>
+
+          <rect class="box" x="650" y="58" width="150" height="44" rx="6"/>
+          <text class="lbl" x="725" y="76"><tspan x="725" dy="0">confusion matrix</tspan><tspan x="725" dy="14">+ per-tier %</tspan></text>
+
+          <rect class="box" x="650" y="150" width="150" height="44" rx="6"/>
+          <text class="lbl" x="725" y="168"><tspan x="725" dy="0">results.json</tspan><tspan x="725" dy="14">→ ROI dashboard</tspan></text>
+
+          <line class="edge" x1="110" y1="80" x2="146" y2="80" marker-end="url(#a2)"/>
+          <text class="elabel" x="128" y="70">load</text>
+          <line class="edge" x1="240" y1="80" x2="276" y2="80" marker-end="url(#a2)"/>
+          <line class="edge" x1="420" y1="80" x2="456" y2="80" marker-end="url(#a2)"/>
+          <text class="elabel" x="438" y="70">tier</text>
+          <line class="edge" x1="610" y1="80" x2="646" y2="80" marker-end="url(#a2)"/>
+          <line class="edge" x1="725" y1="102" x2="725" y2="146" marker-end="url(#a2)"/>
+          <text class="elabel" x="760" y="128">writes</text>
+        </svg>
+        <figcaption class="cap">The teal step is the actual point of the harness: a scored lead means nothing until it's checked against a hand-labeled expected answer. Miss reasoning gets logged too, not just the tally — that's what turns a pass rate into a debuggable report.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 03 — RED TEAM -->
+  <div class="project">
+    <div class="phead"><span class="pnum">03</span><span class="pcat">Security</span></div>
+    <h2 class="ptitle">Red-team your own agent</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>Prompt injection has held #1 on the OWASP LLM Top 10 for two editions running, and AI Red Teamer salaries run $160K–230K. Most candidates have built agents; almost none have actually attacked their own.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 780 220" role="img" aria-label="An automated attack corpus from Garak or PyRIT sends adversarial prompts at a tool-using agent, which either leaks a finding or gets blocked by a guardrail, feeding a writeup with a before-after guardrail diff.">
+          <defs><marker id="a3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="78" width="140" height="44" rx="6"/>
+          <text class="lbl" x="70" y="96"><tspan x="70" dy="0">Garak / PyRIT</tspan><tspan x="70" dy="14">attack corpus</tspan></text>
+
+          <rect class="box" x="180" y="78" width="140" height="44" rx="6"/>
+          <text class="lbl" x="250" y="96"><tspan x="250" dy="0">target agent</tspan><tspan x="250" dy="14">(tool-using)</tspan></text>
+
+          <rect class="box accent" x="360" y="10" width="160" height="44" rx="6"/>
+          <text class="lbl on-accent" x="440" y="28"><tspan x="440" dy="0">leaked / bypassed</tspan><tspan x="440" dy="14">(a finding)</tspan></text>
+
+          <rect class="box" x="360" y="146" width="160" height="44" rx="6"/>
+          <text class="lbl" x="440" y="164"><tspan x="440" dy="0">blocked by</tspan><tspan x="440" dy="14">guardrail</tspan></text>
+
+          <rect class="box" x="560" y="78" width="150" height="44" rx="6"/>
+          <text class="lbl" x="635" y="96"><tspan x="635" dy="0">writeup +</tspan><tspan x="635" dy="14">guardrail diff</tspan></text>
+
+          <line class="edge" x1="140" y1="100" x2="176" y2="100" marker-end="url(#a3)"/>
+          <text class="elabel" x="158" y="90">attacks</text>
+          <line class="edge" x1="320" y1="93" x2="356" y2="35" marker-end="url(#a3)"/>
+          <text class="elabel" x="330" y="60">if succeeds</text>
+          <line class="edge" x1="320" y1="107" x2="356" y2="165" marker-end="url(#a3)"/>
+          <text class="elabel" x="330" y="140">if blocked</text>
+          <line class="edge" x1="520" y1="35" x2="556" y2="92" marker-end="url(#a3)"/>
+          <line class="edge" x1="520" y1="165" x2="556" y2="108" marker-end="url(#a3)"/>
+        </svg>
+        <figcaption class="cap">The teal outcome is the one worth having: a successful leak is the finding the writeup is built around — "here's what broke and how I fixed it" beats a clean scan every time, because a clean scan alone proves nothing.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 04 — MCP SERVERS -->
+  <div class="project">
+    <div class="phead"><span class="pnum">04</span><span class="pcat">Protocol</span></div>
+    <h2 class="ptitle">Ship MCP servers people actually use</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>MCP is now the de facto agent-integration standard — 97M monthly SDK downloads, 9,400+ public servers, native support from every major lab. Install counts and a merged pull request are validation an interviewer can check themselves in thirty seconds.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 900 240" role="img" aria-label="An internal tool is wrapped as an MCP server, validated with the MCP Inspector, published to the registry, and installed into Claude, Cursor, or other clients - with a separate pull request opened against an upstream agent framework.">
+          <defs><marker id="a4" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="78" width="130" height="44" rx="6"/>
+          <text class="lbl" x="65" y="96"><tspan x="65" dy="0">your tool /</tspan><tspan x="65" dy="14">internal API</tspan></text>
+
+          <rect class="box" x="170" y="78" width="130" height="44" rx="6"/>
+          <text class="lbl" x="235" y="96"><tspan x="235" dy="0">MCP server</tspan><tspan x="235" dy="14">(stdio / HTTP)</tspan></text>
+
+          <rect class="box" x="340" y="78" width="130" height="44" rx="6"/>
+          <text class="lbl" x="405" y="96"><tspan x="405" dy="0">MCP Inspector</tspan><tspan x="405" dy="14">validate</tspan></text>
+
+          <rect class="box accent" x="510" y="78" width="130" height="44" rx="6"/>
+          <text class="lbl on-accent" x="575" y="96"><tspan x="575" dy="0">MCP registry</tspan><tspan x="575" dy="14">publish</tspan></text>
+
+          <rect class="box" x="680" y="78" width="180" height="44" rx="6"/>
+          <text class="lbl" x="770" y="96"><tspan x="770" dy="0">Claude / Cursor</tspan><tspan x="770" dy="14">/ other clients</tspan></text>
+
+          <rect class="box" x="170" y="176" width="200" height="44" rx="6"/>
+          <text class="lbl" x="270" y="194"><tspan x="270" dy="0">PR → LangGraph</tspan><tspan x="270" dy="14">/ CrewAI repo</tspan></text>
+
+          <line class="edge" x1="130" y1="100" x2="166" y2="100" marker-end="url(#a4)"/>
+          <text class="elabel" x="148" y="90">wrap</text>
+          <line class="edge" x1="300" y1="100" x2="336" y2="100" marker-end="url(#a4)"/>
+          <text class="elabel" x="318" y="90">test</text>
+          <line class="edge" x1="470" y1="100" x2="506" y2="100" marker-end="url(#a4)"/>
+          <text class="elabel" x="488" y="90">ship</text>
+          <line class="edge" x1="640" y1="100" x2="676" y2="100" marker-end="url(#a4)"/>
+          <text class="elabel" x="658" y="90">install</text>
+          <line class="edge dashed" x1="235" y1="122" x2="270" y2="172" marker-end="url(#a4)"/>
+          <text class="elabel" x="288" y="150">separately</text>
+        </svg>
+        <figcaption class="cap">The teal step is the moment a private tool becomes public proof: registry install counts and a merged PR are evidence a resume line can't fake, which is exactly why this is the highest-leverage-per-hour project on the list.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 05 — VOICE AGENT -->
+  <div class="project">
+    <div class="phead"><span class="pnum">05</span><span class="pcat">Voice</span></div>
+    <h2 class="ptitle">A voice agent with a measured containment rate</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>Voice-agent deployments grew 340% YoY, cutting per-call cost from $7–12 down to roughly $0.40. A measured containment rate is a number a hiring manager can sanity-check — a scripted demo call is not.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 880 220" role="img" aria-label="An inbound call reaches Vapi or Retell for telephony and speech conversion, an LLM handles booking or qualification logic, then a containment decision either resolves the call with a CRM write or hands off to a human rep.">
+          <defs><marker id="a5" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="78" width="110" height="44" rx="6"/>
+          <text class="lbl" x="55" y="104">inbound call</text>
+
+          <rect class="box" x="150" y="78" width="130" height="44" rx="6"/>
+          <text class="lbl" x="215" y="96"><tspan x="215" dy="0">Vapi / Retell</tspan><tspan x="215" dy="14">telephony + STT/TTS</tspan></text>
+
+          <rect class="box" x="320" y="78" width="140" height="44" rx="6"/>
+          <text class="lbl" x="390" y="96"><tspan x="390" dy="0">LLM logic:</tspan><tspan x="390" dy="14">book / qualify</tspan></text>
+
+          <rect class="box accent" x="500" y="78" width="160" height="44" rx="6" stroke-dasharray="3 3"/>
+          <text class="lbl on-accent" x="580" y="96"><tspan x="580" dy="0">containment?</tspan><tspan x="580" dy="14">handoff decision</tspan></text>
+
+          <rect class="box" x="700" y="10" width="170" height="44" rx="6"/>
+          <text class="lbl" x="785" y="28"><tspan x="785" dy="0">resolved →</tspan><tspan x="785" dy="14">CRM write</tspan></text>
+
+          <rect class="box" x="700" y="146" width="170" height="44" rx="6"/>
+          <text class="lbl" x="785" y="164"><tspan x="785" dy="0">escalate →</tspan><tspan x="785" dy="14">human rep</tspan></text>
+
+          <line class="edge" x1="110" y1="100" x2="146" y2="100" marker-end="url(#a5)"/>
+          <text class="elabel" x="128" y="90">answers</text>
+          <line class="edge" x1="280" y1="100" x2="316" y2="100" marker-end="url(#a5)"/>
+          <line class="edge" x1="460" y1="100" x2="496" y2="100" marker-end="url(#a5)"/>
+          <line class="edge" x1="660" y1="93" x2="696" y2="38" marker-end="url(#a5)"/>
+          <text class="elabel" x="672" y="60">yes (~80%)</text>
+          <line class="edge" x1="660" y1="107" x2="696" y2="165" marker-end="url(#a5)"/>
+          <text class="elabel" x="672" y="145">no</text>
+        </svg>
+        <figcaption class="cap">The teal decision is the metric to report: containment rate is the single number production voice-agent deployments are graded on, so a project without it is just a phone tree with extra steps.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 06 — MINI SOC -->
+  <div class="project">
+    <div class="phead"><span class="pnum">06</span><span class="pcat">Security Ops</span></div>
+    <h2 class="ptitle">A miniature autonomous SOC analyst</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>Agentic triage cut BEC dwell time from 24 days to under 24 minutes across 630 real incidents. Still 1–5% market penetration — almost nobody in the applicant pool has actually built one.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 850 240" role="img" aria-label="A security alert feed is ingested by an agent that queries threat intelligence APIs, correlates evidence, drafts an incident report, and stops at a human approval gate before any containment action is logged.">
+          <defs><marker id="a6" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="78" width="150" height="44" rx="6"/>
+          <text class="lbl" x="75" y="96"><tspan x="75" dy="0">alert feed</tspan><tspan x="75" dy="14">(SIEM / honeypot)</tspan></text>
+
+          <rect class="box" x="190" y="78" width="90" height="44" rx="6"/>
+          <text class="lbl" x="235" y="104">agent</text>
+
+          <rect class="box" x="320" y="78" width="140" height="44" rx="6"/>
+          <text class="lbl" x="390" y="96"><tspan x="390" dy="0">VirusTotal /</tspan><tspan x="390" dy="14">AbuseIPDB</tspan></text>
+
+          <rect class="box" x="500" y="78" width="130" height="44" rx="6"/>
+          <text class="lbl" x="565" y="96"><tspan x="565" dy="0">evidence</tspan><tspan x="565" dy="14">correlation</tspan></text>
+
+          <rect class="box accent" x="670" y="78" width="140" height="44" rx="6"/>
+          <text class="lbl on-accent" x="740" y="96"><tspan x="740" dy="0">human</tspan><tspan x="740" dy="14">approval gate</tspan></text>
+
+          <rect class="box" x="670" y="170" width="140" height="44" rx="6"/>
+          <text class="lbl" x="740" y="188"><tspan x="740" dy="0">containment</tspan><tspan x="740" dy="14">action + log</tspan></text>
+
+          <line class="edge" x1="150" y1="100" x2="186" y2="100" marker-end="url(#a6)"/>
+          <text class="elabel" x="168" y="90">ingest</text>
+          <line class="edge" x1="280" y1="100" x2="316" y2="100" marker-end="url(#a6)"/>
+          <text class="elabel" x="298" y="90">query</text>
+          <line class="edge" x1="460" y1="100" x2="496" y2="100" marker-end="url(#a6)"/>
+          <line class="edge" x1="630" y1="100" x2="666" y2="100" marker-end="url(#a6)"/>
+          <text class="elabel" x="648" y="90">report</text>
+          <line class="edge" x1="740" y1="122" x2="740" y2="166" marker-end="url(#a6)"/>
+          <text class="elabel" x="775" y="148">approved</text>
+        </svg>
+        <figcaption class="cap">The teal gate is the whole safety story: the agent investigates and drafts autonomously, but nothing gets contained without a human in the loop — that boundary is the difference between a useful tool and a liability.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 07 — COST ROUTER -->
+  <div class="project">
+    <div class="phead"><span class="pnum">07</span><span class="pcat">Infrastructure</span></div>
+    <h2 class="ptitle">A cost-aware model router</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>Open-weight models now hit 70–85% of frontier quality at $0 marginal cost per request. Every VP of Engineering running agents at scale has to defend this exact tradeoff to finance — showing you've already run the numbers is a shortcut to their actual problem.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 820 220" role="img" aria-label="An incoming request passes through a complexity classifier that routes low-stakes queries to a local open-weight model and high-stakes queries to a frontier API, logging cost and quality for both paths.">
+          <defs><marker id="a7" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="78" width="110" height="44" rx="6"/>
+          <text class="lbl" x="55" y="96"><tspan x="55" dy="0">incoming</tspan><tspan x="55" dy="14">request</tspan></text>
+
+          <rect class="box accent" x="150" y="78" width="130" height="44" rx="6" stroke-dasharray="3 3"/>
+          <text class="lbl on-accent" x="215" y="96"><tspan x="215" dy="0">complexity</tspan><tspan x="215" dy="14">classifier</tspan></text>
+
+          <rect class="box" x="320" y="10" width="150" height="44" rx="6"/>
+          <text class="lbl" x="395" y="28"><tspan x="395" dy="0">local model</tspan><tspan x="395" dy="14">Ollama / vLLM</tspan></text>
+
+          <rect class="box" x="320" y="146" width="150" height="44" rx="6"/>
+          <text class="lbl" x="395" y="164"><tspan x="395" dy="0">frontier API</tspan><tspan x="395" dy="14">Claude</tspan></text>
+
+          <rect class="box" x="520" y="78" width="160" height="44" rx="6"/>
+          <text class="lbl" x="600" y="96"><tspan x="600" dy="0">response +</tspan><tspan x="600" dy="14">cost/quality log</tspan></text>
+
+          <line class="edge" x1="110" y1="100" x2="146" y2="100" marker-end="url(#a7)"/>
+          <line class="edge" x1="280" y1="93" x2="316" y2="35" marker-end="url(#a7)"/>
+          <text class="elabel" x="290" y="60">low stakes</text>
+          <line class="edge" x1="280" y1="107" x2="316" y2="165" marker-end="url(#a7)"/>
+          <text class="elabel" x="290" y="140">high stakes</text>
+          <line class="edge" x1="470" y1="35" x2="516" y2="90" marker-end="url(#a7)"/>
+          <line class="edge" x1="470" y1="165" x2="516" y2="108" marker-end="url(#a7)"/>
+        </svg>
+        <figcaption class="cap">The teal classifier is the whole product: the router itself is simple, but the decision it makes on every single request is the $ saved / quality lost tradeoff curve you present as the deliverable.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 08 — PAYMENTS AGENT -->
+  <div class="project">
+    <div class="phead"><span class="pnum">08</span><span class="pcat">Payments · frontier</span></div>
+    <h2 class="ptitle">An agent that pays for its own tools</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>x402 processed 150M+ agent-initiated transactions (~$50M) in its first nine months. This stack is genuinely new — almost no candidate has hands-on experience with it yet, which is exactly what makes it the rarest project on the list.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 900 240" role="img" aria-label="An agent needing a paid resource gets an HTTP 402 response, checks it against a hard budget cap, then pays via the x402 stablecoin protocol or a signed AP2 mandate if under budget, or is blocked with no spend if over it.">
+          <defs><marker id="a8" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="78" width="140" height="44" rx="6"/>
+          <text class="lbl" x="70" y="96"><tspan x="70" dy="0">agent needs</tspan><tspan x="70" dy="14">paid resource</tspan></text>
+
+          <rect class="box" x="180" y="78" width="130" height="44" rx="6"/>
+          <text class="lbl" x="245" y="96"><tspan x="245" dy="0">API responds</tspan><tspan x="245" dy="14">HTTP 402</tspan></text>
+
+          <rect class="box accent" x="350" y="78" width="120" height="44" rx="6" stroke-dasharray="3 3"/>
+          <text class="lbl on-accent" x="410" y="96"><tspan x="410" dy="0">budget cap</tspan><tspan x="410" dy="14">check</tspan></text>
+
+          <rect class="box" x="510" y="10" width="150" height="44" rx="6"/>
+          <text class="lbl" x="585" y="28"><tspan x="585" dy="0">x402:</tspan><tspan x="585" dy="14">stablecoin pay</tspan></text>
+
+          <rect class="box" x="510" y="146" width="150" height="44" rx="6"/>
+          <text class="lbl" x="585" y="164"><tspan x="585" dy="0">AP2:</tspan><tspan x="585" dy="14">signed mandate</tspan></text>
+
+          <rect class="box reject" x="350" y="176" width="180" height="44" rx="6"/>
+          <text class="lbl" x="440" y="194"><tspan x="440" dy="0">over cap →</tspan><tspan x="440" dy="14">blocked, no spend</tspan></text>
+
+          <rect class="box" x="710" y="78" width="170" height="44" rx="6"/>
+          <text class="lbl" x="795" y="96"><tspan x="795" dy="0">service granted</tspan><tspan x="795" dy="14">+ audit log</tspan></text>
+
+          <line class="edge" x1="140" y1="100" x2="176" y2="100" marker-end="url(#a8)"/>
+          <line class="edge" x1="310" y1="100" x2="346" y2="100" marker-end="url(#a8)"/>
+          <line class="edge" x1="470" y1="93" x2="506" y2="35" marker-end="url(#a8)"/>
+          <text class="elabel" x="480" y="60">under cap</text>
+          <line class="edge" x1="470" y1="107" x2="506" y2="165" marker-end="url(#a8)"/>
+          <line class="edge dashed" x1="410" y1="122" x2="425" y2="172" marker-end="url(#a8)"/>
+          <text class="elabel" x="400" y="160">over cap</text>
+          <line class="edge" x1="660" y1="35" x2="706" y2="90" marker-end="url(#a8)"/>
+          <line class="edge" x1="660" y1="165" x2="706" y2="108" marker-end="url(#a8)"/>
+        </svg>
+        <figcaption class="cap">The teal check is the only thing standing between an autonomous agent and your bank balance — it's also the one-page explainer that closes the interview: what the agent was allowed to spend, and how that limit was cryptographically enforced.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 09 — GOVERNED AGENT -->
+  <div class="project">
+    <div class="phead"><span class="pnum">09</span><span class="pcat">Compliance</span></div>
+    <h2 class="ptitle">A governed agent for a regulated workflow</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>73% of healthcare AI deployments fail HIPAA compliance by default. Responsible-AI documentation is explicitly flagged as high-signal and low-competition — most candidates skip it because it isn't fun to build.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 880 240" role="img" aria-label="A request causes an agent to draft an action, which a policy engine checks against role-based access and dollar thresholds - within bounds it auto-executes, over threshold it routes to a human four-eyes approval - and either path writes to an immutable audit log.">
+          <defs><marker id="a9" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="98" width="100" height="44" rx="6"/>
+          <text class="lbl" x="50" y="124">request</text>
+
+          <rect class="box" x="140" y="98" width="130" height="44" rx="6"/>
+          <text class="lbl" x="205" y="116"><tspan x="205" dy="0">agent drafts</tspan><tspan x="205" dy="14">action</tspan></text>
+
+          <rect class="box accent" x="310" y="98" width="170" height="44" rx="6" stroke-dasharray="3 3"/>
+          <text class="lbl on-accent" x="395" y="116"><tspan x="395" dy="0">policy engine:</tspan><tspan x="395" dy="14">RBAC + threshold</tspan></text>
+
+          <rect class="box" x="520" y="30" width="170" height="44" rx="6"/>
+          <text class="lbl" x="605" y="48"><tspan x="605" dy="0">within bounds →</tspan><tspan x="605" dy="14">auto-execute</tspan></text>
+
+          <rect class="box" x="520" y="166" width="170" height="44" rx="6"/>
+          <text class="lbl" x="605" y="184"><tspan x="605" dy="0">over threshold →</tspan><tspan x="605" dy="14">human (four-eyes)</tspan></text>
+
+          <rect class="box" x="730" y="98" width="130" height="44" rx="6"/>
+          <text class="lbl" x="795" y="116"><tspan x="795" dy="0">immutable</tspan><tspan x="795" dy="14">audit log</tspan></text>
+
+          <line class="edge" x1="100" y1="120" x2="136" y2="120" marker-end="url(#a9)"/>
+          <line class="edge" x1="270" y1="120" x2="306" y2="120" marker-end="url(#a9)"/>
+          <line class="edge" x1="480" y1="113" x2="516" y2="55" marker-end="url(#a9)"/>
+          <text class="elabel" x="490" y="80">ok</text>
+          <line class="edge" x1="480" y1="127" x2="516" y2="185" marker-end="url(#a9)"/>
+          <text class="elabel" x="490" y="160">flagged</text>
+          <line class="edge" x1="690" y1="55" x2="726" y2="110" marker-end="url(#a9)"/>
+          <line class="edge" x1="690" y1="185" x2="726" y2="130" marker-end="url(#a9)"/>
+          <text class="elabel" x="740" y="165">after approval</text>
+        </svg>
+        <figcaption class="cap">The teal engine is the artifact that closes the interview: a data-flow diagram and one control that stops the agent from doing the one thing it absolutely shouldn't — the exact document a compliance-anxious hiring manager wants to see.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 10 — MEMORY AGENT -->
+  <div class="project">
+    <div class="phead"><span class="pnum">10</span><span class="pcat">Memory</span></div>
+    <h2 class="ptitle">An agent that remembers you for weeks, benchmarked</h2>
+    <div class="block">
+      <h3>Why</h3>
+      <p>Letta scores ~83% on LongMemEval; Mem0 processes 1B+ tokens/day in production. Memory went from afterthought to first-class agent component in 2026 — and almost nobody benchmarks it properly.</p>
+    </div>
+    <div class="block">
+      <h3>How</h3>
+      <figure class="dg">
+        <svg class="dg-svg" viewBox="0 0 900 260" role="img" aria-label="A user message reaches an agent that queries a Letta or Mem0 memory layer across core, archival, and recall tiers, retrieves relevant context to augment the prompt, generates an LLM response, and separately extracts and writes new facts back into memory.">
+          <defs><marker id="a10" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="currentColor"/></marker></defs>
+          <rect class="box" x="0" y="98" width="120" height="44" rx="6"/>
+          <text class="lbl" x="60" y="116"><tspan x="60" dy="0">user</tspan><tspan x="60" dy="14">message</tspan></text>
+
+          <rect class="box" x="160" y="98" width="90" height="44" rx="6"/>
+          <text class="lbl" x="205" y="124">agent</text>
+
+          <rect class="box accent" x="290" y="98" width="150" height="44" rx="6"/>
+          <text class="lbl on-accent" x="365" y="116"><tspan x="365" dy="0">memory layer:</tspan><tspan x="365" dy="14">Letta / Mem0</tspan></text>
+
+          <rect class="box" x="480" y="98" width="170" height="44" rx="6"/>
+          <text class="lbl" x="565" y="116"><tspan x="565" dy="0">core / archival /</tspan><tspan x="565" dy="14">recall retrieval</tspan></text>
+
+          <rect class="box" x="690" y="98" width="130" height="44" rx="6"/>
+          <text class="lbl" x="755" y="116"><tspan x="755" dy="0">LLM</tspan><tspan x="755" dy="14">response</tspan></text>
+
+          <line class="edge" x1="120" y1="120" x2="156" y2="120" marker-end="url(#a10)"/>
+          <line class="edge" x1="250" y1="120" x2="286" y2="120" marker-end="url(#a10)"/>
+          <text class="elabel" x="268" y="110">query</text>
+          <line class="edge" x1="440" y1="120" x2="476" y2="120" marker-end="url(#a10)"/>
+          <line class="edge" x1="650" y1="120" x2="686" y2="120" marker-end="url(#a10)"/>
+          <text class="elabel" x="668" y="110">augment</text>
+
+          <path class="edge dashed" d="M 755 142 L 755 220 L 365 220 L 365 146" marker-end="url(#a10)"/>
+          <text class="elabel" x="560" y="236">extract new facts → write back</text>
+        </svg>
+        <figcaption class="cap">The teal layer and the dashed loop are the two things worth building carefully: the tiered retrieval (what gets recalled) and the write-back (what gets remembered) are what the LongMemEval-style benchmark actually measures over weeks of use, not a single scripted "it remembered my name" demo.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <footer>
+    Diagrams are architecture, not implementation — every box names the real tool or framework it stands for, but project #01 (Lead Router) is the only one built end to end. Full research, sourcing, and the "ship it where people already are" distribution framework live in <a href="https://claude.ai/code/artifact/02b489c1-763f-4138-bbd0-020e7d0a544e">Proof of Work</a>.
+  </footer>
+
+</div>
