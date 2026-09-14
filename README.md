@@ -1,7 +1,5 @@
 # Lead Router
 
-Project #01 from the [Proof of Work](https://claude.ai/code/artifact/02b489c1-763f-4138-bbd0-020e7d0a544e) portfolio: automate one back-office task end to end, then measure what it was actually worth.
-
 This one qualifies and routes inbound leads for a commercial cleaning and facilities contractor. It's split into two halves: n8n handles the plumbing (the webhook, notifications, the CRM handoff), and a Python/LangGraph service does the actual thinking. There's also an eval harness and an ROI dashboard, since a demo GIF doesn't tell you if the thing works or if it's worth the money.
 
 If you wanted to point this at a different business, most of the work is already done. The business profile (who the ideal customer is, the routing rules, the fallback keywords) lives in one plain-language file, [`business.yaml`](business.yaml), instead of being buried in Python. The Slack notifications in the n8n workflow are also real HTTP calls to a webhook URL, not placeholders. See the [go-live checklist](#go-live-checklist) below for what it actually takes to point this at a real client.
