@@ -62,9 +62,15 @@ def prefilter_node(state: LeadState) -> LeadState:
     """The free cost-saving check: catches empty messages and obvious spam
     keyword matches before anything reaches the paid scorer. Anything that
     doesn't match here is genuinely ambiguous and needs real judgment, so
-    it's left for score_node instead of guessed at here."""
+    it's left for score_node instead of guessed at here.
+
+    Scans message + company, matching heuristic_score()'s field scope
+    (agent/scoring.py) - a vendor pitch that names itself in `company`
+    but keeps `message` clean would otherwise reach the LLM unfiltered
+    even though the cheaper heuristic path would have caught it.
+    """
     lead = state["lead"]
-    text = lead.message.lower()
+    text = f"{lead.message} {lead.company or ''}".lower()
     if state["message_length"] == 0 or any(k in text for k in SPAM_KEYWORDS):
         return {**state, "prefiltered": "spam"}
     return {**state, "prefiltered": None}

@@ -113,6 +113,20 @@ keywords:
     - "test test"
     - "asdf"
     - "lorem ipsum"
+    # Added after agent-red-team's di-04/spe-03 got past the list above
+    # unworded exactly like it: same SEO/marketing vendor pitch, phrased
+    # around it ("rank higher" instead of "increase your ranking", etc.).
+    # None of these phrases have any legitimate use in an inbound message
+    # to a commercial cleaning/facilities company - see business.yaml's
+    # ideal_customer text.
+    - "rank higher"
+    - "local search results"
+    - "arrange placements"
+    - "strengthen your domain"
+    - "strengthen their website"
+    - "online presence"
+    - "free audit"
+    - "digital marketing"
 
 free_email_domains:
   - "gmail.com"
