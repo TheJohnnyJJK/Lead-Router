@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200" width="640" height="200" role="img" aria-labelledby="p4t">
+  <title id="p4t">Four piles: hot, warm, cold, and spam</title>
+  <rect width="640" height="200" rx="20" fill="#12162A"/>
+  <text x="320" y="30" font-family="Georgia, 'Times New Roman', serif" font-size="16" fill="#B9C0DE" text-anchor="middle">Then it goes in one of four piles</text>
+
+  <g transform="translate(20,50)">
+    <rect width="140" height="126" rx="14" fill="#4A2A33"/>
+    <rect x="14" y="14" width="112" height="24" rx="12" fill="#FF6B5B"/>
+    <text x="70" y="31" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#2B1210" text-anchor="middle">🔥 HOT</text>
+    <text x="14" y="66" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">Ring the bell -</text>
+    <text x="14" y="82" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">sales hears now.</text>
+  </g>
+
+  <g transform="translate(174,50)">
+    <rect width="140" height="126" rx="14" fill="#4A3B22"/>
+    <rect x="10" y="14" width="120" height="24" rx="12" fill="#FFC15E"/>
+    <text x="70" y="31" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#2B2007" text-anchor="middle">🌤️ WARM</text>
+    <text x="14" y="66" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">Good fit,</text>
+    <text x="14" y="82" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">no rush.</text>
+  </g>
+
+  <g transform="translate(328,50)">
+    <rect width="140" height="126" rx="14" fill="#22344A"/>
+    <rect x="12" y="14" width="116" height="24" rx="12" fill="#7FB4E8"/>
+    <text x="70" y="31" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#122234" text-anchor="middle">❄️ COLD</text>
+    <text x="14" y="66" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">Not quite a fit -</text>
+    <text x="14" y="82" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">still kept.</text>
+  </g>
+
+  <g transform="translate(482,50)">
+    <rect width="140" height="126" rx="14" fill="#262C4A"/>
+    <rect x="10" y="14" width="120" height="24" rx="12" fill="#8C93B8"/>
+    <text x="70" y="31" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700" fill="#181C36" text-anchor="middle">🗑️ SPAM</text>
+    <text x="14" y="66" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">A vendor pitch,</text>
+    <text x="14" y="82" font-family="Karla, sans-serif" font-size="12" fill="#F5EFE0">not a customer.</text>
+  </g>
+</svg>

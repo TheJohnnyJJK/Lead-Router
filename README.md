@@ -1,5 +1,75 @@
 # Lead Router
 
+## The story
+
+### 1. Letters keep arriving.
+
+![Three letters arriving at a mail slot - a web form, a referral, and a cold email](docs/panel-1-letters.svg)
+
+A website form. A referral from a happy customer. A cold email. All day,
+every day, inquiries keep landing in the mail slot for Meridian Facility
+Services - and somebody has to figure out which ones are actually worth
+chasing.
+
+### 2. Meet Dispatch, the mail sorter.
+
+![Dispatch, a friendly robot mail sorter, standing alone](docs/panel-2-dispatch.svg)
+
+Dispatch reads every single letter that comes in, and never lets one just
+sit in the pile unread.
+
+### 3. Dispatch checks two things.
+
+![Two question cards: is this our kind of customer, and how urgent does it feel](docs/panel-3-questions.svg)
+
+Is this really our kind of customer? And how urgent does it feel?
+
+### 4. Then it goes in one of four piles.
+
+![Four piles: hot, warm, cold, and spam](docs/panel-4-piles.svg)
+
+Big fit and real urgency rings the bell for sales right away. Good fit,
+no rush, goes in the regular follow-up pile. Not quite the right fit -
+but still a real person - gets kept, not thrown away. A vendor pitch
+goes straight in the bin.
+
+### 5. No smart helper today? Dispatch still works.
+
+![Dispatch with a simple checklist clipboard, working even without its smart helper](docs/panel-5-fallback.svg)
+
+Most days Dispatch reads carefully and thinks it through. But if its
+smart helper is ever unavailable, Dispatch doesn't just freeze - it
+falls back to a simple checklist so nothing ever gets stuck unsorted.
+
+### 6. Every decision goes in the ledger.
+
+![A ledger book where every decision gets written down](docs/panel-6-ledger.svg)
+
+Nothing is sorted quietly and forgotten - every inquiry, every score, and
+which pile it landed in gets written down.
+
+That's the whole idea. There's also an
+[illustrated, interactive version of this story](https://claude.ai/code/artifact/b1f81a6f-71d1-4eaf-ac72-adc8b71f4253)
+if you'd rather click through it than scroll. Everything below is how it
+actually works.
+
+<details>
+<summary><strong>Peek at the grown-up version</strong> - what each part of the story actually is in the code</summary>
+
+| In the story | In the code |
+|---|---|
+| Letters arriving | `POST /qualify` - inbound leads from n8n's webhook (web form, referral, cold email, content download) |
+| Dispatch | `agent/graph.py`'s LangGraph pipeline - prefilter, then scoring |
+| The two questions | `icp_fit_score` and `urgency_score`, each 0-100, produced by the scorer |
+| Four piles | `tier`: hot / warm / cold / spam, each mapped to a `suggested_owner` |
+| No smart helper today | `agent/scoring.py::heuristic_score()` - a deterministic keyword fallback when no `ANTHROPIC_API_KEY` is set or the LLM call fails |
+| The ledger | `agent/store.py` - a SQLite record of every lead, its score, and which scorer actually ran |
+| Ringing the bell | n8n routes a `hot`/`warm` lead to a Slack Incoming Webhook |
+
+</details>
+
+## How it actually works
+
 This one qualifies and routes inbound leads for a commercial cleaning and facilities contractor. It's split into two halves: n8n handles the plumbing (the webhook, notifications, the CRM handoff), and a Python/LangGraph service does the actual thinking. There's also an eval harness and an ROI dashboard, since a demo GIF doesn't tell you if the thing works or if it's worth the money.
 
 If you wanted to point this at a different business, most of the work is already done. The business profile (who the ideal customer is, the routing rules, the fallback keywords) lives in one plain-language file, [`business.yaml`](business.yaml), instead of being buried in Python. The Slack notifications in the n8n workflow are also real HTTP calls to a webhook URL, not placeholders. See the [go-live checklist](#go-live-checklist) below for what it actually takes to point this at a real client.

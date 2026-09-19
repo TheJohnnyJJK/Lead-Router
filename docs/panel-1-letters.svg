@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 200" width="640" height="200" role="img" aria-labelledby="p1t">
+  <title id="p1t">Three letters arriving at a mail slot - a web form, a referral, and a cold email</title>
+  <defs>
+    <radialGradient id="g1" cx="50%" cy="55%" r="65%">
+      <stop offset="0%" stop-color="#2A3260" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#12162A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="200" rx="20" fill="#12162A"/>
+  <rect width="640" height="200" rx="20" fill="url(#g1)"/>
+  <rect x="260" y="140" width="120" height="30" rx="5" fill="#232A52"/>
+  <g transform="translate(90,60) rotate(-8)">
+    <rect width="76" height="52" rx="5" fill="#F5EFE0" stroke="#B9C0DE" stroke-width="2"/>
+    <path d="M0 6l38 28 38-28" stroke="#8C93B8" stroke-width="2" fill="none"/>
+  </g>
+  <g transform="translate(282,44) rotate(4)">
+    <rect width="76" height="52" rx="5" fill="#F5EFE0" stroke="#B9C0DE" stroke-width="2"/>
+    <path d="M0 6l38 28 38-28" stroke="#8C93B8" stroke-width="2" fill="none"/>
+  </g>
+  <g transform="translate(470,66) rotate(-4)">
+    <rect width="76" height="52" rx="5" fill="#F5EFE0" stroke="#B9C0DE" stroke-width="2"/>
+    <path d="M0 6l38 28 38-28" stroke="#8C93B8" stroke-width="2" fill="none"/>
+  </g>
+  <rect x="0" y="176" width="640" height="24" fill="#0D1020"/>
+</svg>
