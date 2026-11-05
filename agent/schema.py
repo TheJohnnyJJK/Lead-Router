@@ -58,11 +58,29 @@ class LeadIn(BaseModel):
     source: Source = "web_form"
 
 
+class LLMScore(BaseModel):
+    """The structured-output schema handed to Claude - the only fields the
+    model is allowed to return. There is deliberately no tier or owner here:
+    agent/rules.py decides those from the two scores. Pydantic validates the
+    model's JSON against these bounds before anything else sees it."""
+
+    icp_fit_score: int = Field(
+        ge=0, le=100, description="How well the lead matches the ICP, 0-100"
+    )
+    urgency_score: int = Field(
+        ge=0, le=100, description="How time-sensitive the need appears, 0-100"
+    )
+    reasoning: str = Field(
+        max_length=_REASONING_MAX,
+        description="One or two sentences a human rep can sanity-check in five seconds",
+    )
+    confidence: float = Field(ge=0, le=1, description="How sure you are of both scores, 0-1")
+
+
 class LeadQualification(BaseModel):
-    """What the agent decides about a lead. This is the structured-output
-    schema handed to Claude - every field below is required in the response,
-    and Pydantic validates the model's JSON against these exact bounds
-    before any of it reaches the database or the API caller."""
+    """What the agent decides about a lead, whichever scorer produced it.
+    On the Claude path this is built by agent/rules.py from an LLMScore; the
+    heuristic fallback and the spam prefilter build it directly."""
 
     tier: Tier
     icp_fit_score: int = Field(

@@ -37,36 +37,45 @@ ideal_customer: |
   services, "grow your business" spam, unrelated software sales), completely
   empty or test submissions, and messages with no discernible business intent.
 
-# The rule for sorting every inbound message into exactly one tier. Keep the
-# four tier names (hot/warm/cold/spam) and the "-> suggested_owner:" lines as
-# they are - graph.py and the rest of the pipeline expect those four values
-# back. Rewrite everything else for your business's actual criteria.
+# The model proposes, the rules decide. Claude only returns two scores (plus
+# a short reason and a confidence); agent/rules.py turns the scores into a
+# tier using tier_rules below, checked top to bottom:
+#
+#   fit < spam_below_fit                              -> spam  (discard)
+#   fit >= hot_min_fit AND urgency >= hot_min_urgency -> hot   (sales-enterprise)
+#   fit >= warm_min_fit                               -> warm  (sales-smb)
+#   anything else                                     -> cold  (nurture)
+tier_rules:
+  spam_below_fit: 5
+  hot_min_fit: 70
+  hot_min_urgency: 60
+  warm_min_fit: 40
+
+# The scoring guide sent to Claude. The score bands here line up with
+# tier_rules above - if you change a threshold, move the matching band too.
 routing_rules: |
-  Classify every inbound message into exactly one tier:
+  You do not choose the lead's tier. You score two things, and fixed rules
+  turn those scores into a tier. Score each one against these anchors.
 
-  - hot: multi-site or facilities-management account, OR single large
-    commercial site, WITH a clear urgency signal (start date, contract
-    expiring, new location opening, inspection/compliance deadline).
-    -> suggested_owner: sales-enterprise
+  icp_fit_score (0-100): how well the sender matches the ideal customer,
+  ignoring urgency.
+  - 0-4: not a genuine lead at all - vendor, SEO or marketing pitches,
+    empty, test or nonsense submissions, no cleaning/facilities need.
+  - 5-39: a real person with a real need who is outside the ICP -
+    residential or home cleaning, tiny one-off jobs, vague inquiries.
+  - 40-69: a single commercial site with a genuine recurring cleaning need.
+  - 70-100: multi-site accounts, facilities-management companies, or a
+    single large commercial site.
 
-  - warm: single commercial site, genuine recurring-cleaning need, but no
-    strong urgency signal, or urgency present but the account is small.
-    -> suggested_owner: sales-smb
+  urgency_score (0-100): time pressure, ignoring fit.
+  - 0-29: no time signal, or urgency is explicitly negated ("nothing urgent").
+  - 30-59: soft timing ("soon", "this quarter", "comparing options").
+  - 60-100: a concrete deadline - a start date, an expiring contract, a new
+    site opening, an inspection or compliance date.
 
-  - cold: residential requests, very small one-off jobs, or vague inquiries
-    from a real person that don't fit the ICP but aren't spam.
-    -> suggested_owner: nurture
-
-  - spam: vendor pitches, SEO/marketing solicitations, empty or nonsensical
-    submissions, anything with no genuine cleaning/facilities need.
-    -> suggested_owner: discard
-
-  icp_fit_score reflects how well the account matches the ICP (company type,
-  size, multi-site potential) independent of urgency. urgency_score reflects
-  time pressure independent of fit. A hot lead needs both to be meaningfully
-  non-zero; a warm lead can have high fit but low urgency, or vice versa.
-  confidence should be lower when the message is short, ambiguous, or missing
-  a company name - don't manufacture certainty the message doesn't support.
+  confidence (0-1): how sure you are of those two scores. Lower it when the
+  message is short, ambiguous, or missing a company name - don't manufacture
+  certainty the message doesn't support.
 
 # Only used as a fallback when no ANTHROPIC_API_KEY is set - simple keyword
 # matching instead of real judgment. Still worth tailoring to your business's

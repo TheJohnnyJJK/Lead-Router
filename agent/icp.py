@@ -20,7 +20,8 @@ _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "business.yaml"
 CONFIG_PATH = Path(os.environ.get("BUSINESS_CONFIG", str(_DEFAULT_CONFIG_PATH)))
 
 _REQUIRED_KEYS = (
-    "business_name", "ideal_customer", "routing_rules", "keywords", "free_email_domains"
+    "business_name", "ideal_customer", "routing_rules", "tier_rules", "keywords",
+    "free_email_domains",
 )
 
 
@@ -44,6 +45,13 @@ _config = _load_config()
 BUSINESS_NAME: str = _config["business_name"]
 ICP_DESCRIPTION: str = _config["ideal_customer"]
 ROUTING_RUBRIC: str = _config["routing_rules"]
+
+# The score thresholds agent/rules.py uses to decide a tier. Indexed with []
+# rather than .get() so a missing threshold fails at startup, not mid-request.
+SPAM_BELOW_FIT: int = _config["tier_rules"]["spam_below_fit"]
+HOT_MIN_FIT: int = _config["tier_rules"]["hot_min_fit"]
+HOT_MIN_URGENCY: int = _config["tier_rules"]["hot_min_urgency"]
+WARM_MIN_FIT: int = _config["tier_rules"]["warm_min_fit"]
 
 # Used by the heuristic fallback (agent/scoring.py) and the graph's free
 # prefilter (agent/graph.py) when no LLM is available.

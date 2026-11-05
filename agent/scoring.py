@@ -3,8 +3,8 @@
 heuristic_score() is deterministic, free, and has no external dependency -
 it's what the golden eval set is graded against when there's no API key,
 and it's the automatic fallback if the LLM call errors. llm_score() is the
-real reasoning path: Claude reads the ICP + routing rubric and returns a
-structured LeadQualification via client.messages.parse().
+real reasoning path: Claude reads the ICP + scoring guide and returns two
+scores via client.messages.parse(); agent/rules.py then decides the tier.
 
 score_lead() is the single entry point the graph calls - it picks LLM when
 available and healthy, heuristic otherwise, and always returns which one
@@ -25,7 +25,8 @@ from .icp import (
     ROUTING_RUBRIC,
     SPAM_KEYWORDS,
 )
-from .schema import LeadIn, LeadQualification
+from .rules import qualify_from_scores
+from .schema import LeadIn, LeadQualification, LLMScore
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ def llm_score(lead: LeadIn) -> LeadQualification:
         max_tokens=1024,
         system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": _format_lead(lead)}],
-        output_format=LeadQualification,
+        output_format=LLMScore,
     )
     # parsed_output is Optional: a refusal or a response that hits max_tokens
     # before finishing its JSON can both leave it unset. Treating that as a
@@ -76,7 +77,8 @@ def llm_score(lead: LeadIn) -> LeadQualification:
         raise ValueError(
             f"Claude returned no parsed output (stop_reason={response.stop_reason!r})"
         )
-    return response.parsed_output
+    # The model proposed the scores; the rules in business.yaml decide the tier.
+    return qualify_from_scores(response.parsed_output)
 
 
 def heuristic_score(lead: LeadIn) -> LeadQualification:
