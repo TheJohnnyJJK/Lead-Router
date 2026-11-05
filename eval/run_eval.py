@@ -19,8 +19,13 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+# Read .env before importing agent/ - agent.store reads LEAD_ROUTER_DB at import
+# time, and the scorer only takes the Claude path if ANTHROPIC_API_KEY is set.
+load_dotenv(ROOT / ".env")
 
 from agent.schema import LeadIn  # noqa: E402
 from agent.scoring import heuristic_score, llm_score  # noqa: E402

@@ -104,7 +104,7 @@ ruff check .
 mypy agent data eval scripts dashboard
 
 # 2. Start the agent service
-uvicorn agent.main:app --reload
+uvicorn agent.main:app --reload --env-file .env
 
 # 3. In another terminal, seed 60 days of realistic history
 python -m scripts.seed_history
