@@ -19,11 +19,14 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
 
 from .schema import LeadIn, LeadQualification, LeadRecord
+
+logger = logging.getLogger(__name__)
 
 # LEAD_ROUTER_DB lets deployment config point this at a different file (or
 # an absolute path) without touching code; the default keeps everything
@@ -61,6 +64,19 @@ CREATE TABLE IF NOT EXISTS leads (
 );
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
 CREATE INDEX IF NOT EXISTS idx_leads_tier ON leads(tier);
+
+-- Everything that did NOT end as a clean decision: requests rejected at the
+-- door (bad input, bad API key), scoring failures that fell back to the
+-- heuristic, crashes, and repeat leads that were deliberately not re-routed.
+-- Successful decisions are already recorded in `leads` itself.
+CREATE TABLE IF NOT EXISTS audit_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    event TEXT NOT NULL,      -- rejected | failed | duplicate
+    reason TEXT NOT NULL,     -- e.g. validation, auth, llm_scoring, qualify_error
+    detail TEXT NOT NULL,
+    lead_key TEXT             -- idempotency_key of the lead, when there is one
+);
 """
 
 
@@ -161,6 +177,29 @@ def insert_lead(
         suggested_owner=qual.suggested_owner, reasoning=qual.reasoning, confidence=qual.confidence,
         needs_review=needs_review, scorer=scorer, latency_ms=latency_ms, created_at=created_at,
     )
+
+
+def log_event(event: str, reason: str, detail: str = "", lead_key: str | None = None) -> None:
+    """Appends one row to audit_events. Never raises: if the database itself
+    is what's broken, the original error matters more than this record, so a
+    failed write is sent to the service log instead."""
+    try:
+        with _conn() as conn:
+            conn.execute(
+                "INSERT INTO audit_events (created_at, event, reason, detail, lead_key) "
+                "VALUES (?,?,?,?,?)",
+                (datetime.datetime.utcnow().isoformat(), event, reason, detail[:500], lead_key),
+            )
+    except Exception:  # noqa: BLE001 - see docstring
+        logger.exception("could not write audit event %s/%s", event, reason)
+
+
+def get_events(limit: int = 50) -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM audit_events ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_leads(limit: int = 50, tier: str | None = None) -> list[dict]:

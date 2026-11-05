@@ -156,3 +156,59 @@ def test_auth_accepts_requests_with_the_correct_key(client, monkeypatch):
         headers={"X-API-Key": "test-secret-123"},
     )
     assert resp.status_code == 200
+
+
+def test_rejected_input_is_recorded_without_its_values(client):
+    client.post("/qualify", json={"name": "X", "email": "not-an-email", "message": "secret text"})
+    [event] = client.get("/audit").json()
+    assert (event["event"], event["reason"]) == ("rejected", "validation")
+    assert "email" in event["detail"]
+    assert "secret text" not in event["detail"] and "not-an-email" not in event["detail"]
+
+
+def test_bad_api_key_is_recorded(client, monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-secret-123")
+    client.get("/stats", headers={"X-API-Key": "wrong"})
+    events = client.get("/audit", headers={"X-API-Key": "test-secret-123"}).json()
+    assert [(e["event"], e["reason"]) for e in events] == [("rejected", "auth")]
+
+
+def test_llm_failure_is_recorded_and_lead_still_routed(client, monkeypatch):
+    import anthropic
+
+    from agent import scoring
+
+    def broken(_lead):
+        raise anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setattr(scoring, "llm_score", broken)
+    body = client.post("/qualify", json={
+        "name": "B", "email": "b@corp.com", "company": "Corp", "message": "Office cleaning?",
+    }).json()
+    assert body["scorer"] == "heuristic"
+    [event] = client.get("/audit").json()
+    assert (event["event"], event["reason"]) == ("failed", "llm_scoring")
+    assert "network error" in event["detail"]
+
+
+def test_repeat_lead_is_recorded(client):
+    lead = {"name": "C", "email": "c@corp.com", "message": "Office cleaning?"}
+    client.post("/qualify", json=lead)
+    client.post("/qualify", json=lead)
+    [event] = client.get("/audit").json()
+    assert (event["event"], event["reason"]) == ("duplicate", "repeat_lead")
+
+
+def test_crash_during_qualify_is_recorded(client, monkeypatch):
+    from agent import main
+
+    def crash(_lead):
+        raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(main, "run_lead", crash)
+    with pytest.raises(RuntimeError):  # TestClient re-raises server errors
+        client.post("/qualify", json={"name": "D", "email": "d@corp.com", "message": "hi"})
+    [event] = client.get("/audit").json()
+    assert (event["event"], event["reason"]) == ("failed", "qualify_error")
+    assert "database is locked" in event["detail"]

@@ -16,6 +16,7 @@ import logging
 import os
 import time
 
+from . import store
 from .icp import (
     BUSINESS_NAME,
     FREE_EMAIL_DOMAINS,
@@ -157,18 +158,28 @@ def score_lead(lead: LeadIn) -> tuple[LeadQualification, str, float]:
             qual = llm_score(lead)
             return qual, "llm", (time.perf_counter() - start) * 1000
         except anthropic.AuthenticationError:
+            reason = "invalid/expired API key"
             logger.error("LLM scoring failed: invalid/expired API key - falling back to heuristic")
         except anthropic.RateLimitError:
+            reason = "rate limited"
             logger.warning("LLM scoring rate-limited - falling back to heuristic for this lead")
         except anthropic.APIStatusError as exc:
+            reason = f"API error {exc.status_code}"
             logger.warning(
                 "LLM scoring failed with API error %s - falling back to heuristic", exc.status_code
             )
         except anthropic.APIConnectionError:
+            reason = "network error"
             logger.warning("LLM scoring unreachable (network) - falling back to heuristic")
-        except Exception:
+        except Exception as exc:
+            reason = f"unexpected {type(exc).__name__}"
             # Anything else (e.g. a response that fails LeadQualification validation) still
             # shouldn't take the webhook down, but it's unexpected enough to log with a trace.
             logger.exception("LLM scoring failed unexpectedly - falling back to heuristic")
+        # Only reached when the Claude call failed: every branch above falls through.
+        store.log_event(
+            "failed", "llm_scoring", f"{reason}; fell back to heuristic",
+            lead_key=store.idempotency_key(lead),
+        )
     qual = heuristic_score(lead)
     return qual, "heuristic", (time.perf_counter() - start) * 1000

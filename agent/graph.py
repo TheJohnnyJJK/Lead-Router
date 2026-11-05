@@ -162,6 +162,10 @@ def run_lead(lead: LeadIn, created_at: str | None = None) -> LeadRecord:
     # decision (marked duplicate=True) without re-scoring or re-routing it.
     existing = store.find_duplicate(lead)
     if existing is not None:
+        store.log_event(
+            "duplicate", "repeat_lead", f"returned stored lead #{existing.id}, not re-routed",
+            lead_key=store.idempotency_key(lead),
+        )
         return existing
     global _compiled_graph
     if _compiled_graph is None:

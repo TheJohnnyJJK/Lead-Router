@@ -21,10 +21,12 @@ from __future__ import annotations
 import os
 import secrets
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
+
+from . import store
 
 
-def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
+def require_api_key(request: Request, x_api_key: str | None = Header(default=None)) -> None:
     """FastAPI dependency - raises 401 if AGENT_API_KEY is set and the
     caller's X-API-Key header doesn't match it.
 
@@ -37,4 +39,6 @@ def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
     if not expected:
         return  # auth disabled - the documented local-dev default
     if not x_api_key or not secrets.compare_digest(x_api_key, expected):
+        # The key itself is never recorded - only that one was missing or wrong.
+        store.log_event("rejected", "auth", f"{request.method} {request.url.path}")
         raise HTTPException(status_code=401, detail="missing or invalid X-API-Key")
