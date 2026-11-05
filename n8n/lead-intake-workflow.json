@@ -177,8 +177,8 @@
     },
     "Route by Tier": {
       "main": [
-        [{"node": "Notify: Slack #hot-leads (placeholder)", "type": "main", "index": 0}],
-        [{"node": "Notify: SMB sales queue (placeholder)", "type": "main", "index": 0}],
+        [{"node": "Slack: #hot-leads", "type": "main", "index": 0}],
+        [{"node": "Slack: #sales-smb", "type": "main", "index": 0}],
         [{"node": "Notify: nurture sequence (placeholder)", "type": "main", "index": 0}],
         [{"node": "Discard: log only", "type": "main", "index": 0}]
       ]
