@@ -60,11 +60,11 @@ actually works.
 |---|---|
 | Letters arriving | `POST /qualify` - inbound leads from n8n's webhook (web form, referral, cold email, content download) |
 | Dispatch | `agent/graph.py`'s LangGraph pipeline - prefilter, then scoring |
-| The two questions | `icp_fit_score` and `urgency_score`, each 0-100, produced by the scorer |
-| Four piles | `tier`: hot / warm / cold / spam, each mapped to a `suggested_owner` |
+| The two questions | `icp_fit_score` and `urgency_score`, each 0-100 - the only judgment Claude is asked for |
+| Four piles | `tier`: hot / warm / cold / spam, decided by `agent/rules.py` from the two scores using thresholds in `business.yaml` |
 | No smart helper today | `agent/scoring.py::heuristic_score()` - a deterministic keyword fallback when no `ANTHROPIC_API_KEY` is set or the LLM call fails |
-| The ledger | `agent/store.py` - a SQLite record of every lead, its score, and which scorer actually ran |
-| Ringing the bell | n8n routes a `hot`/`warm` lead to a Slack Incoming Webhook |
+| The ledger | `agent/store.py` - a SQLite record of every lead and its decision, plus an `audit_events` table for everything that was rejected, failed, or skipped |
+| Ringing the bell | n8n posts a `hot`/`warm` lead to Slack - unless it's a repeat, or confidence is low enough that a human should look first |
 
 </details>
 
@@ -90,6 +90,26 @@ The graph isn't just a straight chain either. `agent/graph.py` has a real condit
 
 The eval set has a couple of traps in it on purpose. One entry in `data/golden_eval_set.json` says "nothing urgent though" — the heuristic scorer keyword-matches on "urgent" and gets it wrong. That's not a bug I quietly fixed; it's the exact kind of mistake the eval harness is supposed to catch, and it's the clearest argument for why the LLM-scored path earns its cost.
 
+## What it does, what's a stub, what's out of scope
+
+**What it actually does today.** Every inbound lead gets a fit score and an urgency score. With an API key those come from Claude; without one (or when the call fails) they come from a keyword checklist. Claude never picks the tier - its output schema doesn't have a tier field. `agent/rules.py` turns the two scores into hot/warm/cold/spam using the thresholds in `business.yaml`, so "what counts as hot" is a config line you can read, not a prompt you hope gets followed. Then:
+
+- If confidence is under `review.min_confidence` (0.6), the lead is flagged `needs_review` and n8n sends it to a review channel instead of routing it. On the heuristic fallback that's every hot and warm lead, on purpose: the checklist never pings sales directly.
+- The same email + message submitted twice returns the stored decision with `duplicate: true`. Nothing gets re-scored, and n8n doesn't post to Slack again. A `UNIQUE` column backs this up if two copies arrive at the same moment.
+- Rejected requests (bad input, bad API key), Claude failures that fell back to the heuristic, crashes, and skipped repeats all go to `audit_events`, readable at `GET /audit`. Successful decisions live in `leads`.
+
+**The honest numbers.** The golden set is 21 hand-labeled cases. The heuristic gets 71.4% (15/21), and only 1 of 4 hot leads. With the confidence gate on, 12 of the 21 go to human review, and the 9 it auto-routes are all correct. There's no Claude accuracy number yet. The rules-based Claude path hasn't been graded, because the eval run for this change failed on an invalid API key. Until `python -m eval.run_eval` runs with a working key, don't trust any Claude figure.
+
+**Reproducibility.** The Claude call doesn't set `temperature=0`, and that's on purpose: current models (including the `claude-opus-5` default here) reject sampling parameters, and SDK 1.x's `messages.parse()` doesn't take them. Two things make results repeatable anyway. The tier is computed deterministically from the scores, and a repeated lead returns its stored decision. Re-scoring the same text from scratch can still produce slightly different scores.
+
+**Still a stub.**
+- Cold leads: the n8n "nurture sequence" node is a placeholder Set node. Nobody actually gets enrolled in anything.
+- The "CRM": it's the SQLite file. Nothing is written to a real CRM.
+- The review queue is a Slack channel (`SLACK_WEBHOOK_REVIEW`), not a tool with approve/reject buttons that feed back into the record.
+- The n8n workflow is hand-written JSON that has never been imported into a live n8n.
+
+**Intentionally out of scope.** Per-user auth and roles (there's one shared secret), retries or delivery tracking for Slack (a failed post shows up in n8n's execution log, not in `audit_events`), migrations for old databases (reset instead), and a golden set built from a real client's historical leads.
+
 ## Quickstart
 
 ```bash
@@ -106,7 +126,9 @@ mypy agent data eval scripts dashboard
 # 2. Start the agent service
 uvicorn agent.main:app --reload --env-file .env
 
-# 3. In another terminal, seed 60 days of realistic history
+# 3. In another terminal, seed 60 days of realistic history. This also wipes
+#    and recreates lead_router.db - do it once after pulling, since the table
+#    gained columns (needs_review, idempotency_key) and old files won't match.
 python -m scripts.seed_history
 
 # 4. Grade the scorer(s) against the golden eval set
@@ -117,11 +139,11 @@ python -m dashboard.generate_dashboard
 # → open dashboard/roi_dashboard.html
 ```
 
-With no `ANTHROPIC_API_KEY` set, all of this runs fully offline on the heuristic scorer. That's on purpose, so you can walk through the whole pipeline without paying for a single API call. Add a key to `.env` and every new `/qualify` call routes through Claude instead (`agent/scoring.py::llm_score`, using `client.messages.parse` against the `LeadQualification` schema in `agent/schema.py`).
+With no `ANTHROPIC_API_KEY` set, all of this runs fully offline on the heuristic scorer. That's on purpose, so you can walk through the whole pipeline without paying for a single API call. Add a key to `.env` and every new `/qualify` call routes through Claude instead (`agent/scoring.py::llm_score`, using `client.messages.parse` against the `LLMScore` schema in `agent/schema.py`). `seed_history` deliberately ignores `.env` and stays on the free heuristic - it pushes about 1,100 leads through the graph.
 
 ## The n8n side
 
-`n8n/lead-intake-workflow.json` is the plumbing: webhook in, call the agent service, route by `tier`, respond to the caller. The hot and warm branches post to real Slack Incoming Webhooks (an actual `POST` with a formatted message, not a placeholder). Cold stays a labeled placeholder, since nurture tooling is different for every client and there's no point faking one. Spam is a dead end on purpose, already fully handled by the audit log.
+`n8n/lead-intake-workflow.json` is the plumbing: webhook in, call the agent service, route by `tier`, respond to the caller. The Switch checks two things before the tier: a repeat lead (`duplicate`) goes to a no-op node, and a low-confidence one (`needs_review`) goes to a review channel. After that, the hot and warm branches post to real Slack Incoming Webhooks (an actual `POST` with a formatted message, not a placeholder). Cold stays a labeled placeholder, since nurture tooling is different for every client and there's no point faking one. Spam is a dead end on purpose, already fully handled by the audit log.
 
 Bring it up with:
 
@@ -150,7 +172,7 @@ This got an actual pass, not just a glance. Here's what came up and what I did a
 Here's the actual short list to point the agent at a real business. None of it touches Python:
 
 1. **Edit `business.yaml`.** Swap in the real business name, the ideal-customer description, the routing rules, and the fallback keyword lists. It's plain YAML with comments explaining each field. `agent/icp.py` loads it at startup, and everything downstream (the LLM prompt, the offline fallback, the dashboard title) picks it up automatically.
-2. **Create two Slack Incoming Webhook URLs** (or one, reused). Takes under 2 minutes at [api.slack.com/apps](https://api.slack.com/apps) → your app → Incoming Webhooks → Add New Webhook. Put them in `.env` as `SLACK_WEBHOOK_HOT` / `SLACK_WEBHOOK_WARM` (see `.env.example`).
+2. **Create three Slack Incoming Webhook URLs** (or fewer, reused). Takes under 2 minutes at [api.slack.com/apps](https://api.slack.com/apps) → your app → Incoming Webhooks → Add New Webhook. Put them in `.env` as `SLACK_WEBHOOK_HOT` / `SLACK_WEBHOOK_WARM` / `SLACK_WEBHOOK_REVIEW` (see `.env.example`).
 3. **Point the real form at the webhook.** Swap out `data/synthetic_leads.py` for whatever the client's actual site or CRM sends, posting to n8n's `/webhook/lead-intake` endpoint.
 4. **Add `ANTHROPIC_API_KEY`** if you want Claude doing the scoring instead of the 71%-accurate heuristic fallback. Real client revenue decisions deserve the real scorer.
 
