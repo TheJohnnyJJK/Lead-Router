@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS leads (
     suggested_owner TEXT NOT NULL,
     reasoning TEXT NOT NULL,
     confidence REAL NOT NULL,
+    needs_review INTEGER NOT NULL,
     scorer TEXT NOT NULL,
     latency_ms REAL NOT NULL,
     created_at TEXT NOT NULL
@@ -93,6 +94,7 @@ def insert_lead(
     qual: LeadQualification,
     scorer: str,
     latency_ms: float,
+    needs_review: bool,
     created_at: str | None = None,
 ) -> LeadRecord:
     """Writes one qualified lead and returns it back as a LeadRecord,
@@ -110,13 +112,13 @@ def insert_lead(
         cur = conn.execute(
             """INSERT INTO leads
                (name, email, company, phone, message, source, tier, icp_fit_score,
-                urgency_score, suggested_owner, reasoning, confidence, scorer,
-                latency_ms, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                urgency_score, suggested_owner, reasoning, confidence, needs_review,
+                scorer, latency_ms, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 lead.name, lead.email, lead.company, lead.phone, lead.message, lead.source,
                 qual.tier, qual.icp_fit_score, qual.urgency_score, qual.suggested_owner,
-                qual.reasoning, qual.confidence, scorer, latency_ms, created_at,
+                qual.reasoning, qual.confidence, needs_review, scorer, latency_ms, created_at,
             ),
         )
         row_id = cur.lastrowid
@@ -128,7 +130,7 @@ def insert_lead(
         phone=lead.phone, message=lead.message, source=lead.source,
         tier=qual.tier, icp_fit_score=qual.icp_fit_score, urgency_score=qual.urgency_score,
         suggested_owner=qual.suggested_owner, reasoning=qual.reasoning, confidence=qual.confidence,
-        scorer=scorer, latency_ms=latency_ms, created_at=created_at,
+        needs_review=needs_review, scorer=scorer, latency_ms=latency_ms, created_at=created_at,
     )
 
 

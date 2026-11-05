@@ -20,7 +20,7 @@ _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "business.yaml"
 CONFIG_PATH = Path(os.environ.get("BUSINESS_CONFIG", str(_DEFAULT_CONFIG_PATH)))
 
 _REQUIRED_KEYS = (
-    "business_name", "ideal_customer", "routing_rules", "tier_rules", "keywords",
+    "business_name", "ideal_customer", "routing_rules", "tier_rules", "review", "keywords",
     "free_email_domains",
 )
 
@@ -52,6 +52,7 @@ SPAM_BELOW_FIT: int = _config["tier_rules"]["spam_below_fit"]
 HOT_MIN_FIT: int = _config["tier_rules"]["hot_min_fit"]
 HOT_MIN_URGENCY: int = _config["tier_rules"]["hot_min_urgency"]
 WARM_MIN_FIT: int = _config["tier_rules"]["warm_min_fit"]
+REVIEW_MIN_CONFIDENCE: float = _config["review"]["min_confidence"]
 
 # Used by the heuristic fallback (agent/scoring.py) and the graph's free
 # prefilter (agent/graph.py) when no LLM is available.

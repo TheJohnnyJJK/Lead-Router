@@ -28,6 +28,7 @@ services:
       # service reads, so both halves of the system share one source of secrets.
       - SLACK_WEBHOOK_HOT=${SLACK_WEBHOOK_HOT:-}
       - SLACK_WEBHOOK_WARM=${SLACK_WEBHOOK_WARM:-}
+      - SLACK_WEBHOOK_REVIEW=${SLACK_WEBHOOK_REVIEW:-}
     volumes:
       # Named volume: n8n's own database/credentials/settings persist across
       # `docker compose down` + `up` instead of resetting every time.

@@ -22,6 +22,7 @@ from langgraph.graph import END, StateGraph
 
 from . import store
 from .icp import SPAM_KEYWORDS
+from .rules import needs_review
 from .schema import LeadIn, LeadQualification, LeadRecord
 from .scoring import score_lead
 
@@ -110,7 +111,8 @@ def persist_node(state: LeadState) -> LeadState:
     return it to the caller."""
     lead, qual = state["lead"], state["qualification"]
     record = store.insert_lead(
-        lead, qual, state["scorer"], state["latency_ms"], created_at=state.get("created_at")
+        lead, qual, state["scorer"], state["latency_ms"],
+        needs_review=needs_review(qual), created_at=state.get("created_at"),
     )
     return {**state, "record": record}
 

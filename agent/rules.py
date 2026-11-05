@@ -7,7 +7,13 @@ edit you can review, not a prompt tweak you have to hope the model follows.
 """
 from __future__ import annotations
 
-from .icp import HOT_MIN_FIT, HOT_MIN_URGENCY, SPAM_BELOW_FIT, WARM_MIN_FIT
+from .icp import (
+    HOT_MIN_FIT,
+    HOT_MIN_URGENCY,
+    REVIEW_MIN_CONFIDENCE,
+    SPAM_BELOW_FIT,
+    WARM_MIN_FIT,
+)
 from .schema import LeadQualification, LLMScore, Owner, Tier
 
 OWNER_BY_TIER: dict[Tier, Owner] = {
@@ -27,6 +33,13 @@ def decide_tier(icp_fit_score: int, urgency_score: int) -> Tier:
     if icp_fit_score >= WARM_MIN_FIT:
         return "warm"
     return "cold"
+
+
+def needs_review(qual: LeadQualification) -> bool:
+    """The confidence gate: below the cutoff, a human looks before anything is
+    routed. Applies to every scorer and every tier, so a shaky "spam" call
+    isn't silently discarded either."""
+    return qual.confidence < REVIEW_MIN_CONFIDENCE
 
 
 def qualify_from_scores(scores: LLMScore) -> LeadQualification:

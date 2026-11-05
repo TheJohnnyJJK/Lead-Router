@@ -51,6 +51,13 @@ tier_rules:
   hot_min_urgency: 60
   warm_min_fit: 40
 
+# Confidence gate. Any lead scored below this confidence is flagged
+# needs_review and goes to a human review channel instead of being
+# auto-routed. The heuristic fallback reports 0.5-0.55 for hot/warm/unknown
+# leads, so with 0.6 nothing the keyword checklist decides pings sales directly.
+review:
+  min_confidence: 0.6
+
 # The scoring guide sent to Claude. The score bands here line up with
 # tier_rules above - if you change a threshold, move the matching band too.
 routing_rules: |

@@ -121,6 +121,9 @@ class LeadRecord(BaseModel):
     suggested_owner: Owner
     reasoning: str
     confidence: float
+    # True when confidence was under business.yaml's review cutoff - n8n
+    # sends these to the review channel instead of routing by tier.
+    needs_review: bool
     scorer: Scorer
     latency_ms: float
     created_at: str

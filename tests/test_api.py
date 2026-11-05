@@ -56,6 +56,22 @@ def test_qualify_hot_lead_then_appears_in_stats_and_leads(client):
     assert stats["by_tier"]["hot"] == 1
 
 
+def test_low_confidence_lead_is_flagged_for_review(client):
+    # The heuristic scores this hot at confidence 0.55, under business.yaml's
+    # 0.6 cutoff - so it's flagged for a human instead of auto-routed.
+    resp = client.post("/qualify", json={
+        "name": "Priya Shah", "email": "priya.shah@summithealth.com",
+        "company": "Summit Health Network", "message": "7 clinics, need a vendor asap",
+    })
+    assert resp.json()["tier"] == "hot"
+    assert resp.json()["needs_review"] is True
+
+
+def test_prefiltered_spam_is_not_flagged_for_review(client):
+    resp = client.post("/qualify", json={"name": "A", "email": "a@b.com", "message": "asdf"})
+    assert resp.json()["needs_review"] is False
+
+
 def test_qualify_rejects_missing_required_field(client):
     resp = client.post("/qualify", json={"name": "No Email"})
     assert resp.status_code == 422

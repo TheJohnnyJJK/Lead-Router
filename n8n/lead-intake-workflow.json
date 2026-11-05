@@ -62,6 +62,14 @@
             {
               "conditions": {
                 "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+                "conditions": [{"leftValue": "={{ $json.needs_review }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
+                "combinator": "and"
+              },
+              "outputKey": "review"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
                 "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "hot", "operator": {"type": "string", "operation": "equals"}}],
                 "combinator": "and"
               },
@@ -95,7 +103,7 @@
         },
         "options": {}
       },
-      "notes": "Four rules, checked top to bottom against the agent's `tier` field (hot/warm/cold/spam - see agent/schema.py's Tier type), one output per match. Each output wire below goes to its own placeholder Set node - swap those for the client's real Slack/CRM/marketing-automation nodes.",
+      "notes": "Checked top to bottom, first match wins. Rule 1 sends anything the agent flagged needs_review (confidence under business.yaml's review.min_confidence) to the review channel, whatever its tier. The other four route on the agent's `tier` field (hot/warm/cold/spam - see agent/schema.py's Tier type), one output per match. Each output wire below goes to its own placeholder Set node - swap those for the client's real Slack/CRM/marketing-automation nodes.",
       "notesInFlow": true
     },
     {
@@ -113,6 +121,23 @@
         "options": {}
       },
       "notes": "REAL, not a placeholder - posts to whatever Slack Incoming Webhook URL is set as SLACK_WEBHOOK_HOT (see .env.example / docker-compose.yml). Create one in under 2 minutes at https://api.slack.com/apps > your app > Incoming Webhooks. Until that env var is set, this node will fail visibly in n8n's execution log rather than silently doing nothing - that's the signal setup isn't finished yet.",
+      "notesInFlow": true
+    },
+    {
+      "id": "notify-review",
+      "name": "Slack: #lead-review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, -60],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_REVIEW }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"text\": \":mag: Needs a human look (scored \" + $json.tier + \", confidence \" + $json.confidence + \") — \" + $json.name + \" (\" + ($json.company || \"no company given\") + \")\\n\" + $json.reasoning + \"\\n\" + $json.email } }}",
+        "options": {}
+      },
+      "notes": "The human-review path. Low-confidence leads land here instead of being auto-routed by tier. Posts to SLACK_WEBHOOK_REVIEW - point it at a channel the team actually triages.",
       "notesInFlow": true
     },
     {
@@ -177,6 +202,7 @@
     },
     "Route by Tier": {
       "main": [
+        [{"node": "Slack: #lead-review", "type": "main", "index": 0}],
         [{"node": "Slack: #hot-leads", "type": "main", "index": 0}],
         [{"node": "Slack: #sales-smb", "type": "main", "index": 0}],
         [{"node": "Notify: nurture sequence (placeholder)", "type": "main", "index": 0}],

@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT))
 # time, and the scorer only takes the Claude path if ANTHROPIC_API_KEY is set.
 load_dotenv(ROOT / ".env")
 
+from agent.rules import needs_review  # noqa: E402
 from agent.schema import LeadIn  # noqa: E402
 from agent.scoring import heuristic_score, llm_score  # noqa: E402
 
@@ -55,6 +56,10 @@ def grade(scorer_name: str, scorer_fn) -> dict:
     confusion: defaultdict[str, defaultdict[str, int]] = defaultdict(lambda: defaultdict(int))
     misses = []
     correct = 0
+    # The confidence gate: how many cases a human would see before routing,
+    # and how accurate the ones that would have been auto-routed are.
+    reviewed = 0
+    auto_total = auto_correct = 0
 
     for case in cases:
         lead = LeadIn(**case["lead"])
@@ -70,6 +75,11 @@ def grade(scorer_name: str, scorer_fn) -> dict:
         expected = case["expected_tier"]
         actual = qual.tier
         confusion[expected][actual] += 1
+        if needs_review(qual):
+            reviewed += 1
+        else:
+            auto_total += 1
+            auto_correct += actual == expected
         if actual == expected:
             correct += 1
         else:
@@ -98,6 +108,8 @@ def grade(scorer_name: str, scorer_fn) -> dict:
         "total_cases": total,
         "accuracy": round(correct / total, 3) if total else 0.0,
         "per_tier_accuracy": per_tier_accuracy,
+        "sent_to_review": reviewed,
+        "auto_routed_accuracy": round(auto_correct / auto_total, 3) if auto_total else None,
         # `confusion` is a defaultdict of defaultdicts, but json.dumps()
         # serializes it exactly like a plain nested dict (it's a dict
         # subclass) - no conversion needed before this goes into results.json.
@@ -109,6 +121,11 @@ def grade(scorer_name: str, scorer_fn) -> dict:
 def print_report(report: dict) -> None:
     print(f"\n=== {report['scorer']} scorer ===")
     print(f"Overall accuracy: {report['accuracy']:.1%}  ({report['total_cases']} cases)")
+    auto_acc = report["auto_routed_accuracy"]
+    print(
+        f"Sent to human review: {report['sent_to_review']}  |  accuracy on the rest: "
+        + (f"{auto_acc:.1%}" if auto_acc is not None else "n/a (all reviewed)")
+    )
     print("Per-tier accuracy:")
     for tier, acc in report["per_tier_accuracy"].items():
         print(f"  {tier:6s} {acc:.1%}")
