@@ -83,8 +83,10 @@ def main() -> None:
             # same path a live n8n webhook call takes - seeding never uses a
             # shortcut that a real request wouldn't, so the resulting
             # history is honest, not just plausible-looking.
-            run_lead(lead, created_at=created_at)
-            total += 1
+            # A generated lead can repeat an earlier one exactly; idempotency
+            # collapses it, so only count the ones actually stored.
+            if not run_lead(lead, created_at=created_at).duplicate:
+                total += 1
 
         if offset % 10 == 0 or offset == 1:
             print(f"...{args.days - offset + 1}/{args.days} days seeded ({total} leads so far)")

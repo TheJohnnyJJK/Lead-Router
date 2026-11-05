@@ -158,6 +158,11 @@ def run_lead(lead: LeadIn, created_at: str | None = None) -> LeadRecord:
     then stamp "now") - seed_history.py is the one caller that passes an
     explicit backdated timestamp, to build 60 days of realistic history.
     """
+    # Idempotency: a repeat of a lead we've already decided returns the stored
+    # decision (marked duplicate=True) without re-scoring or re-routing it.
+    existing = store.find_duplicate(lead)
+    if existing is not None:
+        return existing
     global _compiled_graph
     if _compiled_graph is None:
         _compiled_graph = build_graph()

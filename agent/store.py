@@ -18,6 +18,7 @@ interpreted as part of the SQL statement itself, no matter what it contains.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -38,6 +39,9 @@ DB_PATH = os.environ.get("LEAD_ROUTER_DB", _DEFAULT_DB_PATH)
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS leads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- sha256 of email + message (see idempotency_key()). UNIQUE is what makes
+    -- a repeated submission impossible to store twice, even under a race.
+    idempotency_key TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     company TEXT,
@@ -89,6 +93,22 @@ def init_db() -> None:
         conn.executescript(SCHEMA)
 
 
+def idempotency_key(lead: LeadIn) -> str:
+    """Same sender + same message = same lead. Lower-cased email and
+    stripped whitespace, so a resubmitted form or a retried webhook matches."""
+    raw = f"{lead.email.strip().lower()}\n{lead.message.strip()}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def find_duplicate(lead: LeadIn) -> LeadRecord | None:
+    """The stored decision for this lead, marked duplicate=True, or None."""
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM leads WHERE idempotency_key = ?", (idempotency_key(lead),)
+        ).fetchone()
+    return LeadRecord(**dict(row), duplicate=True) if row else None
+
+
 def insert_lead(
     lead: LeadIn,
     qual: LeadQualification,
@@ -105,23 +125,32 @@ def insert_lead(
     so a live /qualify call always gets "now".
     """
     created_at = created_at or datetime.datetime.utcnow().isoformat()
-    with _conn() as conn:
-        # Every `?` below is filled from the tuple that follows, in order -
-        # this is the parameterized-query pattern described in the module
-        # docstring, and it's what keeps this call injection-proof.
-        cur = conn.execute(
-            """INSERT INTO leads
-               (name, email, company, phone, message, source, tier, icp_fit_score,
-                urgency_score, suggested_owner, reasoning, confidence, needs_review,
-                scorer, latency_ms, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (
-                lead.name, lead.email, lead.company, lead.phone, lead.message, lead.source,
-                qual.tier, qual.icp_fit_score, qual.urgency_score, qual.suggested_owner,
-                qual.reasoning, qual.confidence, needs_review, scorer, latency_ms, created_at,
-            ),
-        )
-        row_id = cur.lastrowid
+    try:
+        with _conn() as conn:
+            # Every `?` below is filled from the tuple that follows, in order -
+            # this is the parameterized-query pattern described in the module
+            # docstring, and it's what keeps this call injection-proof.
+            cur = conn.execute(
+                """INSERT INTO leads
+                   (idempotency_key, name, email, company, phone, message, source, tier,
+                    icp_fit_score, urgency_score, suggested_owner, reasoning, confidence,
+                    needs_review, scorer, latency_ms, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    idempotency_key(lead), lead.name, lead.email, lead.company, lead.phone,
+                    lead.message, lead.source, qual.tier, qual.icp_fit_score,
+                    qual.urgency_score, qual.suggested_owner, qual.reasoning,
+                    qual.confidence, needs_review, scorer, latency_ms, created_at,
+                ),
+            )
+            row_id = cur.lastrowid
+    except sqlite3.IntegrityError:
+        # Two identical leads raced past run_lead()'s duplicate check and this
+        # one lost on the UNIQUE key: return the first decision, store nothing.
+        existing = find_duplicate(lead)
+        if existing is None:
+            raise  # some other constraint failed - not a duplicate
+        return existing
     # Built by hand from `lead`/`qual` rather than re-reading the row back
     # from the database - we already have every field in memory, so a
     # second round-trip query would just be a slower way to get the same data.

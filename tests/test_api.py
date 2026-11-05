@@ -72,6 +72,36 @@ def test_prefiltered_spam_is_not_flagged_for_review(client):
     assert resp.json()["needs_review"] is False
 
 
+def test_repeated_lead_returns_stored_decision_without_a_second_row(client):
+    lead = {"name": "Owen", "email": "owen@thornburylaw.com", "company": "Thornbury Law",
+            "message": "Considering a switch for our office."}
+    first = client.post("/qualify", json=lead).json()
+    # Same sender and message, different case/whitespace: still the same lead.
+    again = client.post("/qualify", json={
+        **lead, "email": "Owen@ThornburyLaw.com",
+        "message": "  Considering a switch for our office. ",
+    }).json()
+    assert first["duplicate"] is False
+    assert again["duplicate"] is True
+    assert again["id"] == first["id"]
+    assert client.get("/stats").json()["total"] == 1
+
+
+def test_unique_key_holds_even_if_the_duplicate_check_is_skipped(client):
+    # Simulates two identical requests racing past run_lead()'s lookup: the
+    # second INSERT hits the UNIQUE constraint and gets the first row back.
+    from agent import store
+    from agent.schema import LeadIn
+    from agent.scoring import heuristic_score
+
+    lead = LeadIn(name="A", email="a@corp.com", company="Corp", message="Office cleaning?")
+    qual = heuristic_score(lead)
+    first = store.insert_lead(lead, qual, "heuristic", 1.0, needs_review=False)
+    second = store.insert_lead(lead, qual, "heuristic", 1.0, needs_review=False)
+    assert second.duplicate is True and second.id == first.id
+    assert store.get_stats()["total"] == 1
+
+
 def test_qualify_rejects_missing_required_field(client):
     resp = client.post("/qualify", json={"name": "No Email"})
     assert resp.status_code == 422
