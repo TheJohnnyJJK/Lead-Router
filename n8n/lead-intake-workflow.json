@@ -6,7 +6,10 @@
       "name": "Lead Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-40, 260],
+      "position": [
+        -40,
+        260
+      ],
       "webhookId": "lead-intake",
       "parameters": {
         "httpMethod": "POST",
@@ -22,7 +25,10 @@
       "name": "Qualify Lead (agent service)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 260],
+      "position": [
+        220,
+        260
+      ],
       "parameters": {
         "method": "POST",
         "url": "http://host.docker.internal:8000/qualify",
@@ -41,7 +47,10 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [480, 140],
+      "position": [
+        480,
+        140
+      ],
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json }}"
@@ -54,55 +63,138 @@
       "name": "Route by Tier",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [480, 380],
+      "position": [
+        480,
+        380
+      ],
       "parameters": {
         "mode": "rules",
         "rules": {
           "values": [
             {
               "conditions": {
-                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
-                "conditions": [{"leftValue": "={{ $json.duplicate }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.duplicate }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "outputKey": "duplicate"
             },
             {
               "conditions": {
-                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
-                "conditions": [{"leftValue": "={{ $json.needs_review }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.needs_review }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "outputKey": "review"
             },
             {
               "conditions": {
-                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
-                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "hot", "operator": {"type": "string", "operation": "equals"}}],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "hot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "outputKey": "hot"
             },
             {
               "conditions": {
-                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
-                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "warm", "operator": {"type": "string", "operation": "equals"}}],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "warm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "outputKey": "warm"
             },
             {
               "conditions": {
-                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
-                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "cold", "operator": {"type": "string", "operation": "equals"}}],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "cold",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "outputKey": "cold"
             },
             {
               "conditions": {
-                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
-                "conditions": [{"leftValue": "={{ $json.tier }}", "rightValue": "spam", "operator": {"type": "string", "operation": "equals"}}],
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tier }}",
+                    "rightValue": "spam",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "outputKey": "spam"
@@ -119,13 +211,16 @@
       "name": "Slack: #hot-leads",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [760, 100],
+      "position": [
+        760,
+        100
+      ],
       "parameters": {
         "method": "POST",
         "url": "={{ $env.SLACK_WEBHOOK_HOT }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"text\": \":fire: Hot lead — \" + $json.name + \" (\" + ($json.company || \"no company given\") + \")\\n\" + $json.reasoning + \"\\n\" + $json.email + ($json.phone ? \" · \" + $json.phone : \"\") } }}",
+        "jsonBody": "={{ { \"text\": \":fire: Hot lead — \" + $json.slack.name + \" (\" + $json.slack.company + \")\\n\" + $json.slack.reasoning + \"\\n\" + $json.slack.email + ($json.phone ? \" · \" + $json.slack.phone : \"\") } }}",
         "options": {}
       },
       "notes": "REAL, not a placeholder - posts to whatever Slack Incoming Webhook URL is set as SLACK_WEBHOOK_HOT (see .env.example / docker-compose.yml). Create one in under 2 minutes at https://api.slack.com/apps > your app > Incoming Webhooks. Until that env var is set, this node will fail visibly in n8n's execution log rather than silently doing nothing - that's the signal setup isn't finished yet.",
@@ -136,11 +231,18 @@
       "name": "Duplicate: already routed",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [760, -220],
+      "position": [
+        760,
+        -220
+      ],
       "parameters": {
         "assignments": {
           "assignments": [
-            {"name": "notification", "type": "string", "value": "=No action - this exact lead (same email + message) was already qualified and routed as lead #{{ $json.id }}."}
+            {
+              "name": "notification",
+              "type": "string",
+              "value": "=No action - this exact lead (same email + message) was already qualified and routed as lead #{{ $json.id }}."
+            }
           ]
         }
       },
@@ -152,13 +254,16 @@
       "name": "Slack: #lead-review",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [760, -60],
+      "position": [
+        760,
+        -60
+      ],
       "parameters": {
         "method": "POST",
         "url": "={{ $env.SLACK_WEBHOOK_REVIEW }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"text\": \":mag: Needs a human look (scored \" + $json.tier + \", confidence \" + $json.confidence + \") — \" + $json.name + \" (\" + ($json.company || \"no company given\") + \")\\n\" + $json.reasoning + \"\\n\" + $json.email } }}",
+        "jsonBody": "={{ { \"text\": \":mag: Needs a human look (scored \" + $json.tier + \", confidence \" + $json.confidence + \") — \" + $json.slack.name + \" (\" + $json.slack.company + \")\\n\" + $json.slack.reasoning + \"\\n\" + $json.slack.email } }}",
         "options": {}
       },
       "notes": "The human-review path. Low-confidence leads land here instead of being auto-routed by tier. Posts to SLACK_WEBHOOK_REVIEW - point it at a channel the team actually triages.",
@@ -169,13 +274,16 @@
       "name": "Slack: #sales-smb",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [760, 260],
+      "position": [
+        760,
+        260
+      ],
       "parameters": {
         "method": "POST",
         "url": "={{ $env.SLACK_WEBHOOK_WARM }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"text\": \"New lead for sales-smb — \" + $json.name + \" (\" + ($json.company || \"no company given\") + \")\\n\" + $json.reasoning + \"\\n\" + $json.email } }}",
+        "jsonBody": "={{ { \"text\": \"New lead for sales-smb — \" + $json.slack.name + \" (\" + $json.slack.company + \")\\n\" + $json.slack.reasoning + \"\\n\" + $json.slack.email } }}",
         "options": {}
       },
       "notes": "REAL - same pattern as the hot-lead node, posting to a separate SLACK_WEBHOOK_WARM URL (can be the same channel or a different one - your call). Swap for a real CRM-write node instead if the client's SMB pipeline lives in a CRM rather than Slack.",
@@ -186,11 +294,18 @@
       "name": "Notify: nurture sequence (placeholder)",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [760, 420],
+      "position": [
+        760,
+        420
+      ],
       "parameters": {
         "assignments": {
           "assignments": [
-            {"name": "notification", "type": "string", "value": "=Replace this Set node with a real marketing-automation trigger: enroll {{ $json.email }} in the nurture sequence."}
+            {
+              "name": "notification",
+              "type": "string",
+              "value": "=Replace this Set node with a real marketing-automation trigger: enroll {{ $json.email }} in the nurture sequence."
+            }
           ]
         }
       },
@@ -202,40 +317,129 @@
       "name": "Discard: log only",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [760, 580],
+      "position": [
+        760,
+        580
+      ],
       "parameters": {
         "assignments": {
           "assignments": [
-            {"name": "notification", "type": "string", "value": "=No action - logged in the agent's audit trail via /qualify. Nothing sent downstream."}
+            {
+              "name": "notification",
+              "type": "string",
+              "value": "=No action - logged in the agent's audit trail via /qualify. Nothing sent downstream."
+            }
           ]
         }
       },
       "notes": "Deliberately a dead end, not a placeholder to fill in - spam is already fully handled by the agent's own audit trail (agent/store.py). Nothing needs to happen here.",
       "notesInFlow": true
+    },
+    {
+      "id": "escape-for-slack",
+      "name": "Escape for Slack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        560
+      ],
+      "parameters": {
+        "jsCode": "// Slack treats <!channel>, <!here>, <@user> and <url|label> in message text\n// as live pings and links. Every value below is attacker-influenced (the\n// sender typed name/company/email/phone, and the model's reasoning can\n// quote them), so escape &, < and > exactly as Slack's docs say to.\n// The routing fields (tier, needs_review, duplicate) pass through unchanged.\nconst esc = (v) => String(v ?? '')\n  .replace(/&/g, '&amp;')\n  .replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;');\n\nreturn $input.all().map((item) => ({\n  json: {\n    ...item.json,\n    slack: {\n      name: esc(item.json.name),\n      company: esc(item.json.company || 'no company given'),\n      reasoning: esc(item.json.reasoning),\n      email: esc(item.json.email),\n      phone: esc(item.json.phone),\n    },\n  },\n}));"
+      },
+      "notes": "Security fix from the agent-red-team scan (SECURITY_FINDINGS.md): nothing a sender typed, or the model quoted, can become a live Slack @channel ping or link.",
+      "notesInFlow": true
     }
   ],
   "connections": {
     "Lead Webhook": {
-      "main": [[{"node": "Qualify Lead (agent service)", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Qualify Lead (agent service)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Qualify Lead (agent service)": {
-      "main": [[
-        {"node": "Respond to Webhook", "type": "main", "index": 0},
-        {"node": "Route by Tier", "type": "main", "index": 0}
-      ]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Escape for Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Route by Tier": {
       "main": [
-        [{"node": "Duplicate: already routed", "type": "main", "index": 0}],
-        [{"node": "Slack: #lead-review", "type": "main", "index": 0}],
-        [{"node": "Slack: #hot-leads", "type": "main", "index": 0}],
-        [{"node": "Slack: #sales-smb", "type": "main", "index": 0}],
-        [{"node": "Notify: nurture sequence (placeholder)", "type": "main", "index": 0}],
-        [{"node": "Discard: log only", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Duplicate: already routed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: #lead-review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: #hot-leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: #sales-smb",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify: nurture sequence (placeholder)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discard: log only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escape for Slack": {
+      "main": [
+        [
+          {
+            "node": "Route by Tier",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
   "active": false,
-  "settings": {"executionOrder": "v1"},
+  "settings": {
+    "executionOrder": "v1"
+  },
   "pinData": {}
 }

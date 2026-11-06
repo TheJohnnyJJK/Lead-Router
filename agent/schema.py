@@ -96,6 +96,9 @@ class LeadQualification(BaseModel):
         description="One or two sentences a human rep can sanity-check in five seconds",
     )
     confidence: float = Field(ge=0, le=1)
+    # Set by agent/rules.py, never by a model (LLMScore has no such field):
+    # true when a rule decided a human must look regardless of confidence.
+    forced_review: bool = False
 
 
 class LeadRecord(BaseModel):

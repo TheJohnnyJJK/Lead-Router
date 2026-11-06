@@ -58,6 +58,16 @@ tier_rules:
 review:
   min_confidence: 0.6
 
+# A lead with no company name AND a free email address (gmail.com etc.) has
+# nothing in it a model can check: "I run 12 sites for a Fortune 500
+# account" is just a claim. The agent-red-team scan showed a small model
+# will happily score that hot with full confidence. So for these leads the
+# fit score is capped (39 = below warm_min_fit, so cold/nurture), and if the
+# cap actually lowered the score, the lead goes to human review too - a real
+# executive writing from Gmail still gets seen by a person.
+unverified_leads:
+  max_fit: 39
+
 # Two-tier scoring, used when SCORER_MODE=cascade. A small local model
 # (Ollama) scores every lead for free; Claude is only called when the local
 # answer can't be trusted on its own:

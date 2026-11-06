@@ -53,6 +53,8 @@ HOT_MIN_FIT: int = _config["tier_rules"]["hot_min_fit"]
 HOT_MIN_URGENCY: int = _config["tier_rules"]["hot_min_urgency"]
 WARM_MIN_FIT: int = _config["tier_rules"]["warm_min_fit"]
 REVIEW_MIN_CONFIDENCE: float = _config["review"]["min_confidence"]
+# Fit cap for leads with no company name and a free email domain (agent/rules.py).
+UNVERIFIED_MAX_FIT: int = _config.get("unverified_leads", {}).get("max_fit", 39)
 
 # The local-model -> Claude cascade (agent/scoring.py, SCORER_MODE=cascade).
 # Optional block: older business.yaml files without it get these defaults.

@@ -100,7 +100,7 @@ def llm_score(lead: LeadIn) -> LeadQualification:
             f"Claude returned no parsed output (stop_reason={response.stop_reason!r})"
         )
     # The model proposed the scores; the rules in business.yaml decide the tier.
-    return qualify_from_scores(response.parsed_output)
+    return qualify_from_scores(response.parsed_output, lead)
 
 
 def local_score(lead: LeadIn) -> LeadQualification:
@@ -129,7 +129,7 @@ def local_score(lead: LeadIn) -> LeadQualification:
     )
     resp.raise_for_status()
     scores = LLMScore.model_validate_json(resp.json()["message"]["content"])
-    return qualify_from_scores(scores)
+    return qualify_from_scores(scores, lead)
 
 
 def needs_escalation(qual: LeadQualification) -> bool:
