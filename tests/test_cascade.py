@@ -28,7 +28,7 @@ def calls(tmp_path, monkeypatch):
     answers: dict = {"local": _qual("warm", 0.9), "claude": _qual("cold", 0.95)}
 
     def fake(name):
-        def run(_lead):
+        def run(_lead, **_kw):
             seen.append(name)
             answer = answers[name]
             if isinstance(answer, Exception):

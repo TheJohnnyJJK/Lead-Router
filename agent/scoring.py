@@ -15,6 +15,8 @@ from __future__ import annotations
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as DeadlineExceeded
 
 import httpx
 
@@ -41,6 +43,21 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 # A local 8B model on a consumer GPU answers in a few seconds. If it takes
 # longer than this, it's stuck or still loading, and the lead moves on.
 LOCAL_TIMEOUT_S = float(os.environ.get("LOCAL_TIMEOUT_S", "10"))
+# The whole scoring step has to finish inside this, because n8n stops waiting
+# for /qualify after 15 s. 10 s leaves room for the rest of the request (and
+# queueing) on top. Every model call gets only what's left of it.
+SCORING_BUDGET_S = float(os.environ.get("SCORING_BUDGET_S", "10"))
+# Upper limit for one Claude call; the SDK default is 10 minutes plus retries.
+CLAUDE_TIMEOUT_S = float(os.environ.get("CLAUDE_TIMEOUT_S", "8"))
+# Not worth starting a Claude call with less time left than this.
+MIN_CLAUDE_S = 2.0
+
+# Model calls run here so score_lead() can stop waiting at a hard deadline.
+# An HTTP client's own timeout limits each phase (connect, read) separately,
+# so a request stuck in Ollama's queue could run past the budget - the
+# 2026-11-06 attack measured 12.1 s against a 10 s limit. A late answer is
+# simply discarded; the thread finishes on its own.
+_MODEL_CALLS = ThreadPoolExecutor(max_workers=16, thread_name_prefix="model-call")
 
 # Set to a list by eval/run_eval.py to collect Claude's token usage per call
 # (that's how the eval prices a lead). None in normal operation.
@@ -70,10 +87,12 @@ def _format_lead(lead: LeadIn) -> str:
     )
 
 
-def llm_score(lead: LeadIn) -> LeadQualification:
+def llm_score(lead: LeadIn, timeout: float | None = None) -> LeadQualification:
     import anthropic  # imported lazily so the module loads without the package during tests
 
-    client = anthropic.Anthropic()
+    # max_retries=0: the SDK's own retries would quietly multiply the wait past
+    # the budget. A failed call falls back instead (see score_lead).
+    client = anthropic.Anthropic(timeout=timeout or CLAUDE_TIMEOUT_S, max_retries=0)
     response = client.messages.parse(
         model=MODEL_ID,
         max_tokens=1024,
@@ -103,7 +122,7 @@ def llm_score(lead: LeadIn) -> LeadQualification:
     return qualify_from_scores(response.parsed_output, lead)
 
 
-def local_score(lead: LeadIn) -> LeadQualification:
+def local_score(lead: LeadIn, timeout: float | None = None) -> LeadQualification:
     """The low-level decider: same prompt, same LLMScore schema, same rules -
     only the model changes. Ollama's `format` takes a JSON schema and
     constrains decoding to it, so the reply parses like Claude's does.
@@ -125,7 +144,7 @@ def local_score(lead: LeadIn) -> LeadQualification:
             # quiet spell would time out and escalate for no real reason.
             "keep_alive": os.environ.get("LOCAL_KEEP_ALIVE", "30m"),
         },
-        timeout=LOCAL_TIMEOUT_S,
+        timeout=timeout or LOCAL_TIMEOUT_S,
     )
     resp.raise_for_status()
     scores = LLMScore.model_validate_json(resp.json()["message"]["content"])
@@ -198,11 +217,11 @@ def _has_claude_key() -> bool:
     return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
 
 
-def _try_local(lead: LeadIn) -> LeadQualification | None:
+def _try_local(lead: LeadIn, timeout: float) -> LeadQualification | None:
     """local_score(), or None (logged to audit_events) if Ollama is down,
     slow, or returns something that doesn't fit the schema."""
     try:
-        return local_score(lead)
+        return _MODEL_CALLS.submit(local_score, lead, timeout=timeout).result(timeout=timeout)
     except Exception as exc:  # noqa: BLE001 - any local failure just means "move on"
         logger.warning("Local scoring failed (%s): %s", type(exc).__name__, exc)
         store.log_event(
@@ -224,29 +243,44 @@ def score_lead(lead: LeadIn) -> tuple[LeadQualification, str, float]:
     because a model is unavailable.
     """
     start = time.perf_counter()
+    deadline = start + SCORING_BUDGET_S
     mode = os.environ.get("SCORER_MODE", "claude").lower()
+
+    def left() -> float:
+        return deadline - time.perf_counter()
 
     def done(qual: LeadQualification, scorer: str):
         return qual, scorer, (time.perf_counter() - start) * 1000
 
+    def claude_if_time() -> LeadQualification | None:
+        if left() < MIN_CLAUDE_S:
+            store.log_event(
+                "failed", "llm_scoring",
+                f"skipped Claude: only {max(left(), 0):.1f}s left "
+                f"of the {SCORING_BUDGET_S:.0f}s budget",
+                lead_key=store.idempotency_key(lead),
+            )
+            return None
+        return _try_claude(lead, timeout=min(CLAUDE_TIMEOUT_S, left()))
+
     if mode in ("local", "cascade"):
-        local = _try_local(lead)
+        local = _try_local(lead, timeout=min(LOCAL_TIMEOUT_S, left()))
         if local is not None and (mode == "local" or not needs_escalation(local)):
             return done(local, "local")
         if mode == "cascade" and _has_claude_key():
-            claude = _try_claude(lead)
+            claude = claude_if_time()
             if claude is not None:
                 return done(claude, "llm")
         if local is not None:
             return done(local, "local")
     elif _has_claude_key():
-        claude = _try_claude(lead)
+        claude = claude_if_time()
         if claude is not None:
             return done(claude, "llm")
     return done(heuristic_score(lead), "heuristic")
 
 
-def _try_claude(lead: LeadIn) -> LeadQualification | None:
+def _try_claude(lead: LeadIn, timeout: float) -> LeadQualification | None:
     """llm_score(), or None if the call failed.
 
     Falling back on an LLM failure is a deliberate availability choice - a
@@ -260,7 +294,10 @@ def _try_claude(lead: LeadIn) -> LeadQualification | None:
     import anthropic
 
     try:
-        return llm_score(lead)
+        return _MODEL_CALLS.submit(llm_score, lead, timeout=timeout).result(timeout=timeout)
+    except DeadlineExceeded:
+        reason = f"no answer within {timeout:.1f}s"
+        logger.warning("LLM scoring hit the time budget - falling back")
     except anthropic.AuthenticationError:
         reason = "invalid/expired API key"
         logger.error("LLM scoring failed: invalid/expired API key - falling back")

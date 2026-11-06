@@ -38,7 +38,11 @@ def require_api_key(request: Request, x_api_key: str | None = Header(default=Non
     expected = os.environ.get("AGENT_API_KEY")
     if not expected:
         return  # auth disabled - the documented local-dev default
-    if not x_api_key or not secrets.compare_digest(x_api_key, expected):
+    # Compared as bytes: compare_digest() raises TypeError on non-ASCII str,
+    # which turned a header like "X-API-Key: café" into an unlogged 500.
+    if not x_api_key or not secrets.compare_digest(
+        x_api_key.encode("utf-8", "surrogateescape"), expected.encode("utf-8")
+    ):
         # The key itself is never recorded - only that one was missing or wrong.
         store.log_event("rejected", "auth", f"{request.method} {request.url.path}")
         raise HTTPException(status_code=401, detail="missing or invalid X-API-Key")

@@ -2,6 +2,7 @@
 
 POST /qualify    run the graph on one inbound lead, persist it, return the decision
 GET  /leads      recent leads, optionally filtered by tier
+POST /leads/{id}/routed   n8n confirms it delivered a lead (sets routed_at)
 GET  /stats      aggregate counts the dashboard is built from
 GET  /audit      rejected requests, scoring failures, crashes and repeat leads
 GET  /health     liveness check - deliberately unauthenticated, so a load
@@ -10,15 +11,17 @@ GET  /health     liveness check - deliberately unauthenticated, so a load
 """
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 
 from . import store
 from .graph import run_lead
+from .limits import BodySizeLimit, RateLimit
 from .schema import LeadIn, LeadRecord, Tier
 from .security import require_api_key
 
@@ -36,7 +39,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Lead Router Agent", version="0.1.0", lifespan=lifespan)
+# The interactive docs (/docs, /redoc, /openapi.json) hand anyone a map of
+# every endpoint and field, without a key. On only when asked for.
+_docs = os.environ.get("ENABLE_API_DOCS", "").lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="Lead Router Agent", version="0.1.0", lifespan=lifespan,
+    docs_url="/docs" if _docs else None, redoc_url="/redoc" if _docs else None,
+    openapi_url="/openapi.json" if _docs else None,
+)
+# Added last = runs first: rate limit, then size limit, then the app.
+app.add_middleware(BodySizeLimit)
+app.add_middleware(RateLimit)
 
 
 @app.exception_handler(RequestValidationError)
@@ -67,6 +80,18 @@ def qualify(lead: LeadIn, _auth: Authed) -> LeadRecord:
             lead_key=store.idempotency_key(lead),
         )
         raise
+
+
+@app.post("/leads/{lead_id}/routed", response_model=LeadRecord)
+def mark_routed(lead_id: int, _auth: Authed) -> LeadRecord:
+    """n8n calls this after it has actually delivered the lead (Slack,
+    nurture or discard). Until then the lead counts as saved but not
+    delivered, and a retry of the same lead gets routed again instead of
+    being dropped as a duplicate."""
+    record = store.mark_routed(lead_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="no such lead")
+    return record
 
 
 @app.get("/leads")

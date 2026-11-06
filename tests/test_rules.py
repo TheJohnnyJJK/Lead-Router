@@ -36,6 +36,9 @@ def test_llm_path_takes_tier_from_rules_not_model(monkeypatch):
     )
 
     class FakeClient:
+        def __init__(self, **_kw):  # accepts timeout= / max_retries=
+            pass
+
         messages = SimpleNamespace(
             parse=lambda **kw: SimpleNamespace(parsed_output=fake_scores, stop_reason="end_turn")
         )

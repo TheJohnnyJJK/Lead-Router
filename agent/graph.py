@@ -160,12 +160,19 @@ def run_lead(lead: LeadIn, created_at: str | None = None) -> LeadRecord:
     """
     # Idempotency: a repeat of a lead we've already decided returns the stored
     # decision (marked duplicate=True) without re-scoring or re-routing it.
+    # If it was saved but never delivered (n8n timed out before routing it),
+    # find_duplicate() returns it with duplicate=False so n8n routes it now -
+    # a possible double ping is better than a lost lead.
     existing = store.find_duplicate(lead)
     if existing is not None:
-        store.log_event(
-            "duplicate", "repeat_lead", f"returned stored lead #{existing.id}, not re-routed",
-            lead_key=store.idempotency_key(lead),
-        )
+        if existing.duplicate:
+            detail = f"returned stored lead #{existing.id}, not re-routed"
+            store.log_event("duplicate", "repeat_lead", detail,
+                            lead_key=store.idempotency_key(lead))
+        else:
+            detail = f"lead #{existing.id} was saved but never delivered; returned for routing"
+            store.log_event("duplicate", "unrouted_retry", detail,
+                            lead_key=store.idempotency_key(lead))
         return existing
     global _compiled_graph
     if _compiled_graph is None:

@@ -60,7 +60,10 @@ CREATE TABLE IF NOT EXISTS leads (
     needs_review INTEGER NOT NULL,
     scorer TEXT NOT NULL,
     latency_ms REAL NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    -- Set when n8n confirms it actually delivered the lead (POST
+    -- /leads/{id}/routed). NULL means saved but not yet delivered.
+    routed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
 CREATE INDEX IF NOT EXISTS idx_leads_tier ON leads(tier);
@@ -107,6 +110,10 @@ def init_db() -> None:
     agent/main.py - and directly by reset_db() below."""
     with _conn() as conn:
         conn.executescript(SCHEMA)
+        # Databases created before routed_at existed get the column added.
+        columns = {r["name"] for r in conn.execute("PRAGMA table_info(leads)")}
+        if "routed_at" not in columns:
+            conn.execute("ALTER TABLE leads ADD COLUMN routed_at TEXT")
 
 
 def idempotency_key(lead: LeadIn) -> str:
@@ -117,12 +124,16 @@ def idempotency_key(lead: LeadIn) -> str:
 
 
 def find_duplicate(lead: LeadIn) -> LeadRecord | None:
-    """The stored decision for this lead, marked duplicate=True, or None."""
+    """The stored decision for this lead, or None. Marked duplicate=True only
+    if it was also delivered (routed_at set); a lead that was saved but never
+    routed comes back with duplicate=False so n8n routes it now."""
     with _conn() as conn:
         row = conn.execute(
             "SELECT * FROM leads WHERE idempotency_key = ?", (idempotency_key(lead),)
         ).fetchone()
-    return LeadRecord(**dict(row), duplicate=True) if row else None
+    if row is None:
+        return None
+    return LeadRecord(**dict(row), duplicate=row["routed_at"] is not None)
 
 
 def insert_lead(
@@ -177,6 +188,18 @@ def insert_lead(
         suggested_owner=qual.suggested_owner, reasoning=qual.reasoning, confidence=qual.confidence,
         needs_review=needs_review, scorer=scorer, latency_ms=latency_ms, created_at=created_at,
     )
+
+
+def mark_routed(lead_id: int) -> LeadRecord | None:
+    """Records that n8n delivered this lead. Idempotent: the first delivery
+    time is kept if n8n reports twice. None if there's no such lead."""
+    now = datetime.datetime.utcnow().isoformat()
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE leads SET routed_at = ? WHERE id = ? AND routed_at IS NULL", (now, lead_id)
+        )
+        row = conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
+    return LeadRecord(**dict(row)) if row else None
 
 
 def log_event(event: str, reason: str, detail: str = "", lead_key: str | None = None) -> None:

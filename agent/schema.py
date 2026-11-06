@@ -131,6 +131,8 @@ class LeadRecord(BaseModel):
     scorer: Scorer
     latency_ms: float
     created_at: str
+    # When n8n confirmed delivery (POST /leads/{id}/routed). None = not yet.
+    routed_at: str | None = None
     # Not stored - set on the response when this lead was already qualified
     # (same email + message), so n8n knows not to route it a second time.
     duplicate: bool = False

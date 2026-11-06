@@ -76,6 +76,7 @@ def test_repeated_lead_returns_stored_decision_without_a_second_row(client):
     lead = {"name": "Owen", "email": "owen@thornburylaw.com", "company": "Thornbury Law",
             "message": "Considering a switch for our office."}
     first = client.post("/qualify", json=lead).json()
+    client.post(f"/leads/{first['id']}/routed")  # n8n confirms delivery
     # Same sender and message, different case/whitespace: still the same lead.
     again = client.post("/qualify", json={
         **lead, "email": "Owen@ThornburyLaw.com",
@@ -98,7 +99,8 @@ def test_unique_key_holds_even_if_the_duplicate_check_is_skipped(client):
     qual = heuristic_score(lead)
     first = store.insert_lead(lead, qual, "heuristic", 1.0, needs_review=False)
     second = store.insert_lead(lead, qual, "heuristic", 1.0, needs_review=False)
-    assert second.duplicate is True and second.id == first.id
+    # Same row back. Not delivered yet, so not flagged as a duplicate.
+    assert second.id == first.id and second.duplicate is False
     assert store.get_stats()["total"] == 1
 
 
@@ -178,7 +180,7 @@ def test_llm_failure_is_recorded_and_lead_still_routed(client, monkeypatch):
 
     from agent import scoring
 
-    def broken(_lead):
+    def broken(_lead, **_kw):
         raise anthropic.APIConnectionError(request=None)  # type: ignore[arg-type]
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
@@ -194,10 +196,28 @@ def test_llm_failure_is_recorded_and_lead_still_routed(client, monkeypatch):
 
 def test_repeat_lead_is_recorded(client):
     lead = {"name": "C", "email": "c@corp.com", "message": "Office cleaning?"}
-    client.post("/qualify", json=lead)
+    first = client.post("/qualify", json=lead).json()
+    client.post(f"/leads/{first['id']}/routed")
     client.post("/qualify", json=lead)
     [event] = client.get("/audit").json()
     assert (event["event"], event["reason"]) == ("duplicate", "repeat_lead")
+
+
+def test_saved_but_undelivered_lead_is_routed_again_on_retry(client):
+    """n8n timed out before routing it: the retry must not be dropped."""
+    lead = {"name": "D", "email": "d@corp.com", "company": "Corp", "message": "Office cleaning?"}
+    first = client.post("/qualify", json=lead).json()
+    retry = client.post("/qualify", json=lead).json()
+    assert retry["id"] == first["id"] and retry["duplicate"] is False
+    [event] = client.get("/audit").json()
+    assert event["reason"] == "unrouted_retry"
+    marked = client.post(f"/leads/{first['id']}/routed").json()
+    assert marked["routed_at"] is not None
+    assert client.post("/qualify", json=lead).json()["duplicate"] is True
+
+
+def test_mark_routed_unknown_lead_is_404(client):
+    assert client.post("/leads/999999/routed").status_code == 404
 
 
 def test_crash_during_qualify_is_recorded(client, monkeypatch):

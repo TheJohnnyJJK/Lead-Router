@@ -39,8 +39,11 @@
           "timeout": 15000
         }
       },
-      "notes": "Calls the FastAPI agent service (agent/main.py's POST /qualify) and gets back the full qualification decision. host.docker.internal is how a container reaches a service running on the host machine - swap it for a real hostname once this deploys alongside the client's actual stack, and note that if AGENT_API_KEY is set on the agent service (see agent/security.py), this node also needs an X-API-Key header added under Options > Headers with the matching value - deliberately not hardcoded here so a real secret never ends up committed in this file.",
-      "notesInFlow": true
+      "notes": "Calls the FastAPI agent service (agent/main.py's POST /qualify) and gets back the full qualification decision. host.docker.internal is how a container reaches a service running on the host machine - swap it for a real hostname once this deploys alongside the client's actual stack, and note that if AGENT_API_KEY is set on the agent service (see agent/security.py), this node also needs an X-API-Key header added under Options > Headers with the matching value - deliberately not hardcoded here so a real secret never ends up committed in this file. Retries up to 3 times: if a call times out, the retry is safe - a lead that was saved but never delivered comes back with duplicate=false and gets routed now (see Mark routed).",
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     },
     {
       "id": "respond",
@@ -349,6 +352,27 @@
       },
       "notes": "Security fix from the agent-red-team scan (SECURITY_FINDINGS.md): nothing a sender typed, or the model quoted, can become a live Slack @channel ping or link.",
       "notesInFlow": true
+    },
+    {
+      "id": "mark-routed",
+      "name": "Mark routed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        260
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://host.docker.internal:8000/leads/' + $('Escape for Slack').item.json.id + '/routed' }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "notes": "Tells the agent this lead was actually delivered (sets routed_at). Only reached after the branch's own step succeeded, so a failed Slack post leaves the lead marked undelivered and a retry routes it again. Add the X-API-Key header here too if AGENT_API_KEY is set.",
+      "notesInFlow": true
     }
   ],
   "connections": {
@@ -430,6 +454,61 @@
         [
           {
             "node": "Route by Tier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: #hot-leads": {
+      "main": [
+        [
+          {
+            "node": "Mark routed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: #lead-review": {
+      "main": [
+        [
+          {
+            "node": "Mark routed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: #sales-smb": {
+      "main": [
+        [
+          {
+            "node": "Mark routed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify: nurture sequence (placeholder)": {
+      "main": [
+        [
+          {
+            "node": "Mark routed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discard: log only": {
+      "main": [
+        [
+          {
+            "node": "Mark routed",
             "type": "main",
             "index": 0
           }
