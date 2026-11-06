@@ -54,6 +54,12 @@ HOT_MIN_URGENCY: int = _config["tier_rules"]["hot_min_urgency"]
 WARM_MIN_FIT: int = _config["tier_rules"]["warm_min_fit"]
 REVIEW_MIN_CONFIDENCE: float = _config["review"]["min_confidence"]
 
+# The local-model -> Claude cascade (agent/scoring.py, SCORER_MODE=cascade).
+# Optional block: older business.yaml files without it get these defaults.
+_cascade = _config.get("cascade", {})
+ESCALATE_BELOW_CONFIDENCE: float = _cascade.get("escalate_below_confidence", 0.8)
+ALWAYS_ESCALATE_TIERS: frozenset[str] = frozenset(_cascade.get("always_escalate_tiers", ["hot"]))
+
 # Used by the heuristic fallback (agent/scoring.py) and the graph's free
 # prefilter (agent/graph.py) when no LLM is available.
 HOT_KEYWORDS: list[str] = _config["keywords"].get("hot", [])

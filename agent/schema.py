@@ -23,7 +23,8 @@ from pydantic import BaseModel, EmailStr, Field
 Source = Literal["web_form", "referral", "cold_email", "content_download"]
 Tier = Literal["hot", "warm", "cold", "spam"]
 Owner = Literal["sales-enterprise", "sales-smb", "nurture", "discard"]
-Scorer = Literal["llm", "heuristic"]
+# "llm" is Claude, "local" is the Ollama model, "heuristic" is the keyword checklist.
+Scorer = Literal["llm", "local", "heuristic"]
 
 # Shared length caps, used on both the inbound lead and the LLM's own
 # output, so the same rule protects "what a caller sends us" and "what we

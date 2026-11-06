@@ -16,9 +16,13 @@ import logging
 import os
 import time
 
+import httpx
+
 from . import store
 from .icp import (
+    ALWAYS_ESCALATE_TIERS,
     BUSINESS_NAME,
+    ESCALATE_BELOW_CONFIDENCE,
     FREE_EMAIL_DOMAINS,
     HOT_KEYWORDS,
     ICP_DESCRIPTION,
@@ -32,6 +36,15 @@ from .schema import LeadIn, LeadQualification, LLMScore
 logger = logging.getLogger(__name__)
 
 MODEL_ID = os.environ.get("ANTHROPIC_MODEL", "claude-opus-5")
+LOCAL_MODEL = os.environ.get("LOCAL_MODEL", "llama3.1:8b")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+# A local 8B model on a consumer GPU answers in a few seconds. If it takes
+# longer than this, it's stuck or still loading, and the lead moves on.
+LOCAL_TIMEOUT_S = float(os.environ.get("LOCAL_TIMEOUT_S", "10"))
+
+# Set to a list by eval/run_eval.py to collect Claude's token usage per call
+# (that's how the eval prices a lead). None in normal operation.
+usage_log: list[dict] | None = None
 
 SYSTEM_PROMPT = f"""You are the lead-qualification agent for {BUSINESS_NAME}.
 
@@ -74,12 +87,55 @@ def llm_score(lead: LeadIn) -> LeadQualification:
     # qualification) is what lets score_lead()'s except-chain catch it and
     # fall back to the heuristic scorer, logged, rather than crashing later
     # with a confusing "NoneType has no attribute .tier".
+    usage = getattr(response, "usage", None)
+    if usage_log is not None and usage is not None:
+        usage_log.append({
+            "input_tokens": usage.input_tokens or 0,
+            "output_tokens": usage.output_tokens or 0,
+            "cache_read_input_tokens": getattr(usage, "cache_read_input_tokens", 0) or 0,
+            "cache_creation_input_tokens": getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        })
     if response.parsed_output is None:
         raise ValueError(
             f"Claude returned no parsed output (stop_reason={response.stop_reason!r})"
         )
     # The model proposed the scores; the rules in business.yaml decide the tier.
     return qualify_from_scores(response.parsed_output)
+
+
+def local_score(lead: LeadIn) -> LeadQualification:
+    """The low-level decider: same prompt, same LLMScore schema, same rules -
+    only the model changes. Ollama's `format` takes a JSON schema and
+    constrains decoding to it, so the reply parses like Claude's does.
+    temperature 0 keeps it repeatable (Ollama accepts sampling params; only
+    the current Claude models reject them)."""
+    resp = httpx.post(
+        f"{OLLAMA_URL}/api/chat",
+        json={
+            "model": LOCAL_MODEL,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": _format_lead(lead)},
+            ],
+            "format": LLMScore.model_json_schema(),
+            "stream": False,
+            "options": {"temperature": 0},
+            # Ollama unloads an idle model after 5 minutes by default; loading it
+            # back takes longer than LOCAL_TIMEOUT_S, so the first lead after a
+            # quiet spell would time out and escalate for no real reason.
+            "keep_alive": os.environ.get("LOCAL_KEEP_ALIVE", "30m"),
+        },
+        timeout=LOCAL_TIMEOUT_S,
+    )
+    resp.raise_for_status()
+    scores = LLMScore.model_validate_json(resp.json()["message"]["content"])
+    return qualify_from_scores(scores)
+
+
+def needs_escalation(qual: LeadQualification) -> bool:
+    """Should Claude double-check the local model's answer? Thresholds live
+    in business.yaml's `cascade` block."""
+    return qual.confidence < ESCALATE_BELOW_CONFIDENCE or qual.tier in ALWAYS_ESCALATE_TIERS
 
 
 def heuristic_score(lead: LeadIn) -> LeadQualification:
@@ -138,48 +194,95 @@ def heuristic_score(lead: LeadIn) -> LeadQualification:
     )
 
 
+def _has_claude_key() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+
+
+def _try_local(lead: LeadIn) -> LeadQualification | None:
+    """local_score(), or None (logged to audit_events) if Ollama is down,
+    slow, or returns something that doesn't fit the schema."""
+    try:
+        return local_score(lead)
+    except Exception as exc:  # noqa: BLE001 - any local failure just means "move on"
+        logger.warning("Local scoring failed (%s): %s", type(exc).__name__, exc)
+        store.log_event(
+            "failed", "local_scoring", f"{type(exc).__name__}; moved on without the local model",
+            lead_key=store.idempotency_key(lead),
+        )
+        return None
+
+
 def score_lead(lead: LeadIn) -> tuple[LeadQualification, str, float]:
     """Returns (qualification, scorer_name, latency_ms).
 
-    Falling back to the heuristic scorer on an LLM failure is a deliberate
-    availability choice - a scoring outage should degrade, not 500 the
-    webhook n8n is waiting on. But degrading silently would hide exactly
-    the kind of problem someone needs to know about (an expired key, a
-    billing block, a sustained outage), so every fallback is logged with
-    the real exception before we ever call heuristic_score(). Anthropic's
+    SCORER_MODE picks the path (see .env.example):
+      claude  - Claude, else the heuristic
+      local   - the local model, else the heuristic
+      cascade - the local model; Claude only if needs_escalation() says so.
+                If Claude then fails, the local answer stands.
+    The heuristic is always the last resort, so the webhook never 500s just
+    because a model is unavailable.
+    """
+    start = time.perf_counter()
+    mode = os.environ.get("SCORER_MODE", "claude").lower()
+
+    def done(qual: LeadQualification, scorer: str):
+        return qual, scorer, (time.perf_counter() - start) * 1000
+
+    if mode in ("local", "cascade"):
+        local = _try_local(lead)
+        if local is not None and (mode == "local" or not needs_escalation(local)):
+            return done(local, "local")
+        if mode == "cascade" and _has_claude_key():
+            claude = _try_claude(lead)
+            if claude is not None:
+                return done(claude, "llm")
+        if local is not None:
+            return done(local, "local")
+    elif _has_claude_key():
+        claude = _try_claude(lead)
+        if claude is not None:
+            return done(claude, "llm")
+    return done(heuristic_score(lead), "heuristic")
+
+
+def _try_claude(lead: LeadIn) -> LeadQualification | None:
+    """llm_score(), or None if the call failed.
+
+    Falling back on an LLM failure is a deliberate availability choice - a
+    scoring outage should degrade, not 500 the webhook n8n is waiting on.
+    But degrading silently would hide exactly the kind of problem someone
+    needs to know about (an expired key, a billing block, a sustained
+    outage), so every failure is logged with the real exception. Anthropic's
     typed exceptions are caught most-specific-first so the log line says
     *why* it fell back, not just that it did.
     """
     import anthropic
 
-    start = time.perf_counter()
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
-        try:
-            qual = llm_score(lead)
-            return qual, "llm", (time.perf_counter() - start) * 1000
-        except anthropic.AuthenticationError:
-            reason = "invalid/expired API key"
-            logger.error("LLM scoring failed: invalid/expired API key - falling back to heuristic")
-        except anthropic.RateLimitError:
-            reason = "rate limited"
-            logger.warning("LLM scoring rate-limited - falling back to heuristic for this lead")
-        except anthropic.APIStatusError as exc:
-            reason = f"API error {exc.status_code}"
-            logger.warning(
-                "LLM scoring failed with API error %s - falling back to heuristic", exc.status_code
-            )
-        except anthropic.APIConnectionError:
-            reason = "network error"
-            logger.warning("LLM scoring unreachable (network) - falling back to heuristic")
-        except Exception as exc:
-            reason = f"unexpected {type(exc).__name__}"
-            # Anything else (e.g. a response that fails LeadQualification validation) still
-            # shouldn't take the webhook down, but it's unexpected enough to log with a trace.
-            logger.exception("LLM scoring failed unexpectedly - falling back to heuristic")
-        # Only reached when the Claude call failed: every branch above falls through.
-        store.log_event(
-            "failed", "llm_scoring", f"{reason}; fell back to heuristic",
-            lead_key=store.idempotency_key(lead),
+    try:
+        return llm_score(lead)
+    except anthropic.AuthenticationError:
+        reason = "invalid/expired API key"
+        logger.error("LLM scoring failed: invalid/expired API key - falling back")
+    except anthropic.RateLimitError:
+        reason = "rate limited"
+        logger.warning("LLM scoring rate-limited - falling back for this lead")
+    except anthropic.APIStatusError as exc:
+        reason = f"API error {exc.status_code}"
+        logger.warning(
+            "LLM scoring failed with API error %s - falling back", exc.status_code
         )
-    qual = heuristic_score(lead)
-    return qual, "heuristic", (time.perf_counter() - start) * 1000
+    except anthropic.APIConnectionError:
+        reason = "network error"
+        logger.warning("LLM scoring unreachable (network) - falling back")
+    except Exception as exc:
+        reason = f"unexpected {type(exc).__name__}"
+        # Anything else (e.g. a response that fails LeadQualification validation) still
+        # shouldn't take the webhook down, but it's unexpected enough to log with a trace.
+        logger.exception("LLM scoring failed unexpectedly - falling back")
+    # Only reached when the Claude call failed: every branch above falls through.
+    store.log_event(
+        "failed", "llm_scoring", f"{reason}; fell back to the next scorer",
+        lead_key=store.idempotency_key(lead),
+    )
+    return None

@@ -58,6 +58,18 @@ tier_rules:
 review:
   min_confidence: 0.6
 
+# Two-tier scoring, used when SCORER_MODE=cascade. A small local model
+# (Ollama) scores every lead for free; Claude is only called when the local
+# answer can't be trusted on its own:
+#   - its confidence is below escalate_below_confidence, or
+#   - it landed in one of always_escalate_tiers (hot leads are rare and they
+#     are where the money is, so Claude double-checks every one).
+# python -m eval.run_eval prints accuracy and Claude-call rate at a range of
+# thresholds, so pick this number from that table, not by feel.
+cascade:
+  escalate_below_confidence: 0.8
+  always_escalate_tiers: ["hot"]
+
 # The scoring guide sent to Claude. The score bands here line up with
 # tier_rules above - if you change a threshold, move the matching band too.
 routing_rules: |
