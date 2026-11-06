@@ -6,65 +6,127 @@
 
 ![Three letters arriving at a mail slot - a web form, a referral, and a cold email](docs/panel-1-letters.svg)
 
-A website form. A referral from a happy customer. A cold email. All day,
-every day, inquiries keep landing in the mail slot for Meridian Facility
-Services - and somebody has to figure out which ones are actually worth
-chasing.
+Meridian Facility Services cleans offices, clinics and schools. All day,
+people get in touch. Someone fills in the form on the website. A happy
+customer sends a friend their way. A stranger emails out of the blue.
+Somebody has to read every one and decide who calls them back.
 
-### 2. Meet Dispatch, the mail sorter.
+### 2. A mail carrier brings each one in.
+
+![A website form sends a letter to a mailbox, and the mail carrier brings it straight to the sorter's desk](docs/panel-carrier.svg)
+
+The moment someone clicks Send, a mail carrier picks up the letter and
+walks it straight to the sorting desk. Nobody has to go and check the
+mailbox. The carrier also waits at the desk, so it can take the answer
+back out again.
+
+### 3. Meet Dispatch, the mail sorter.
 
 ![Dispatch, a friendly robot mail sorter, standing alone](docs/panel-2-dispatch.svg)
 
-Dispatch reads every single letter that comes in, and never lets one just
-sit in the pile unread.
+Dispatch reads every single letter that comes in, and never lets one sit
+in the pile unread.
 
-### 3. Dispatch checks two things.
+### 4. First, a few quick checks at the door.
+
+![Three quick checks at the door: is it a proper letter, has it arrived before, and is it obvious junk](docs/panel-door.svg)
+
+Is this a proper letter, with a real email address and an actual
+message? Has this exact letter already arrived? (People double-click.
+If it's a repeat, Dispatch hands back the answer it already gave and
+doesn't bother anyone twice.) Is it obvious junk, like someone selling
+website ads? Junk goes straight in the bin without anyone having to
+read it.
+
+### 5. Dispatch asks two questions.
 
 ![Two question cards: is this our kind of customer, and how urgent does it feel](docs/panel-3-questions.svg)
 
-Is this really our kind of customer? And how urgent does it feel?
+Is this really our kind of customer? And how soon do they need us?
 
-### 4. Then it goes in one of four piles.
+### 6. Two helpers do the reading.
+
+![A small apprentice helper reads every letter, and passes only the important or tricky ones to a senior expert](docs/panel-helpers.svg)
+
+Dispatch has an apprentice who lives right there in the office. The
+apprentice reads every letter, costs nothing, and is right most of the
+time. There's also a senior expert who works from far away and charges
+for every letter they read. So the expert only sees two kinds of letter:
+the big, exciting ones, because those matter too much to get wrong, and
+the ones the apprentice isn't sure about. In testing, that got the
+expert's accuracy while sending the expert well under half the letters.
+
+### 7. The rulebook picks the pile.
 
 ![Four piles: hot, warm, cold, and spam](docs/panel-4-piles.svg)
 
-Big fit and real urgency rings the bell for sales right away. Good fit,
-no rush, goes in the regular follow-up pile. Not quite the right fit -
-but still a real person - gets kept, not thrown away. A vendor pitch
-goes straight in the bin.
+The helpers only give two scores. They never choose the pile themselves.
+A short rulebook on the wall does that. Big fit and real urgency rings
+the bell for sales. Good fit with no rush goes to the regular follow-up
+pile. A real person who isn't quite the right fit is kept, not thrown
+away. A sales pitch goes in the bin. Because the rulebook is written
+down, anyone can read it, and changing it doesn't mean retraining
+anybody.
 
-### 5. No smart helper today? Dispatch still works.
+### 8. Not sure? Ask a person.
+
+![An unsure letter goes into a please-check tray, and a person takes a look before anything else happens](docs/panel-human.svg)
+
+Every helper also says how sure they are. If the answer is shaky,
+Dispatch doesn't guess. The letter goes into a "please check" tray and a
+real person looks at it first.
+
+### 9. No helpers today? Dispatch still works.
 
 ![Dispatch with a simple checklist clipboard, working even without its smart helper](docs/panel-5-fallback.svg)
 
-Most days Dispatch reads carefully and thinks it through. But if its
-smart helper is ever unavailable, Dispatch doesn't just freeze - it
-falls back to a simple checklist so nothing ever gets stuck unsorted.
+If the apprentice is out sick and the expert can't be reached, Dispatch
+doesn't freeze. It pulls out a simple checklist so nothing gets stuck.
+The checklist isn't very sharp, so anything it would send to sales goes
+to the "please check" tray instead.
 
-### 6. Every decision goes in the ledger.
+### 10. Every decision goes in the ledger.
 
 ![A ledger book where every decision gets written down](docs/panel-6-ledger.svg)
 
-Nothing is sorted quietly and forgotten - every inquiry, every score, and
-which pile it landed in gets written down.
+Every letter gets written down, along with both scores, which pile it
+went to, and who decided. So does everything that went wrong, like a
+helper not answering or a letter that arrived twice. If someone asks
+"why didn't I hear about this one?", the answer is in the book.
 
-That's the whole idea. There's also an
-[illustrated, interactive version of this story](https://claude.ai/code/artifact/b1f81a6f-71d1-4eaf-ac72-adc8b71f4253)
-if you'd rather click through it than scroll. Everything below is how it
-actually works.
+### 11. The bell rings.
+
+![The bell rings, a salesperson's phone lights up with the new lead, and the sender gets a thank-you note back](docs/panel-bell.svg)
+
+The carrier takes the decision back out. The right salesperson's phone
+lights up within seconds, with a one-line reason they can check at a
+glance. The person who wrote in gets a thank-you straight away.
+
+That's the whole idea. If you'd rather click through it,
+[Dispatch's Blueprints](https://claude.ai/artifact/TWwGdy9Ui52GNmLZgMQh1x)
+follows one letter through every step, with the real code beside each
+one. Everything below is how it actually works.
 
 <details>
 <summary><strong>Peek at the grown-up version</strong> - what each part of the story actually is in the code</summary>
 
 | In the story | In the code |
 |---|---|
-| Letters arriving | `POST /qualify` - inbound leads from n8n's webhook (web form, referral, cold email, content download) |
-| Dispatch | `agent/graph.py`'s LangGraph pipeline - prefilter, then scoring |
-| The two questions | `icp_fit_score` and `urgency_score`, each 0-100 - the only judgment Claude is asked for |
-| Four piles | `tier`: hot / warm / cold / spam, decided by `agent/rules.py` from the two scores using thresholds in `business.yaml` |
-| No smart helper today | `agent/scoring.py::heuristic_score()` - a deterministic keyword fallback when no `ANTHROPIC_API_KEY` is set or the LLM call fails |
-| The ledger | `agent/store.py` - a SQLite record of every lead and its decision, plus an `audit_events` table for everything that was rejected, failed, or skipped |
-| Ringing the bell | n8n posts a `hot`/`warm` lead to Slack - unless it's a repeat, or confidence is low enough that a human should look first |
+| Letters arriving | A form, CRM or email parser POSTing JSON to n8n's `/webhook/lead-intake` |
+| The mail carrier | n8n: the Webhook node receives the lead, an HTTP Request node forwards it to `POST /qualify`, and Respond to Webhook answers the sender |
+| Dispatch | The FastAPI service (`agent/main.py`) and its LangGraph pipeline (`agent/graph.py`) |
+| Proper letter? | Pydantic validation on `LeadIn` (`agent/schema.py`), plus the optional `X-API-Key` check (`agent/security.py`) |
+| Already arrived? | Idempotency: a SHA-256 of email + message, backed by a `UNIQUE` column (`agent/store.py`) |
+| Obvious junk | The graph's prefilter: empty messages and spam keywords skip the models entirely |
+| The two questions | `icp_fit_score` and `urgency_score`, each 0-100, plus a `confidence` |
+| The apprentice | A local model (`llama3.1:8b` via Ollama) in `agent/scoring.py::local_score()` |
+| The expert | Claude, via `client.messages.parse()` in `llm_score()` |
+| Who reads what | `SCORER_MODE=cascade`: Claude is called only when the local model says hot or its confidence is under 0.8 (`business.yaml` under `cascade`) |
+| The rulebook | `agent/rules.py::decide_tier()` with thresholds from `business.yaml` |
+| "Please check" tray | `needs_review` when confidence is under 0.6, routed to a review Slack channel |
+| The checklist | `heuristic_score()`, the last resort when no model answers |
+| The ledger | SQLite: the `leads` table, plus `audit_events` for everything rejected, failed or skipped |
+| The bell | n8n's Switch node posting to Slack Incoming Webhooks, checked in order: duplicate, review, then tier |
 
 </details>
 
@@ -78,15 +140,18 @@ If you wanted to point this at a different business, most of the work is already
 inbound lead ─▶ n8n webhook ─▶ FastAPI /qualify ─▶ LangGraph agent ─▶ SQLite ─▶ n8n routes by tier
                                                         │
                                                         ├─ prefilter (free, catches obvious spam)
-                                                        └─ score: Claude if ANTHROPIC_API_KEY set,
-                                                                  deterministic heuristic otherwise
+                                                        └─ score (SCORER_MODE):
+                                                             claude  - Claude scores every lead
+                                                             local   - a local Ollama model scores every lead
+                                                             cascade - local first, Claude only for hot or unsure leads
+                                                             (keyword heuristic if no model answers)
 ```
 
 ## Why it's built this way
 
 If there's no API key, the heuristic scorer takes over instead of the request just failing. That's the real fallback path this thing runs in production, not a stub, and the eval harness grades it honestly (71.4% overall, worse on the `hot` tier) instead of pretending it's fine.
 
-The graph isn't just a straight chain either. `agent/graph.py` has a real conditional edge: messages that are obviously empty or full of spam keywords never make it to the LLM at all. Same idea as project #07 in the portfolio — don't pay for a frontier model to answer something two lines of Python already knows.
+The graph isn't just a straight chain either. `agent/graph.py` has a real conditional edge: messages that are obviously empty or full of spam keywords never make it to the LLM at all. Don't pay for a frontier model to answer something two lines of Python already knows. The cascade below is the same idea one level up.
 
 The eval set has a couple of traps in it on purpose. One entry in `data/golden_eval_set.json` says "nothing urgent though" — the heuristic scorer keyword-matches on "urgent" and gets it wrong. That's not a bug I quietly fixed; it's the exact kind of mistake the eval harness is supposed to catch, and it's the clearest argument for why the LLM-scored path earns its cost.
 
@@ -98,7 +163,11 @@ The eval set has a couple of traps in it on purpose. One entry in `data/golden_e
 - The same email + message submitted twice returns the stored decision with `duplicate: true`. Nothing gets re-scored, and n8n doesn't post to Slack again. A `UNIQUE` column backs this up if two copies arrive at the same moment.
 - Rejected requests (bad input, bad API key), Claude failures that fell back to the heuristic, crashes, and skipped repeats all go to `audit_events`, readable at `GET /audit`. Successful decisions live in `leads`.
 
-**The honest numbers.** The golden set is 21 hand-labeled cases. The heuristic gets 71.4% (15/21), and only 1 of 4 hot leads. With the confidence gate on, 12 of the 21 go to human review, and the 9 it auto-routes are all correct. There's no Claude accuracy number yet. The rules-based Claude path hasn't been graded, because the eval run for this change failed on an invalid API key. Until `python -m eval.run_eval` runs with a working key, don't trust any Claude figure.
+**The honest numbers.** The golden set is 21 hand-labeled cases. The heuristic gets 71.4% (15/21), and only 1 of 4 hot leads. With the confidence gate on, 12 of the 21 go to human review, and the 9 it auto-routes are all correct. The Claude path gets 90.5% (19/21), and all 4 hot leads. It sends 2 of the 21 to review, and those 2 are exactly its 2 misses, so everything it auto-routes is correct. One miss is the keyword-stuffed price-shopping trap: Claude called it warm instead of cold. The other is a whitespace-only message. The eval grades the scorer on its own, so it skips the graph's prefilter, which in the real pipeline would mark that lead as spam before Claude ever saw it. Run on 2026-11-06, 21 cases. It's a small set, so read it as "clearly better than the heuristic", not as a precise rate.
+
+**A cheap model first, Claude when it matters.** With `SCORER_MODE=cascade`, a local model (`llama3.1:8b` through Ollama, on an RTX 3070) scores every lead for free. Claude is only called if the local model says hot, or its confidence is under 0.8. Hot leads always get a second look because they're rare and they're the expensive ones to get wrong. That rule earned its place in testing. The local model gets 85.7% on its own and finds all 4 hot leads, but it was confidently wrong twice, and both times it had said hot. The cascade matched Claude's 90.5% while calling Claude on 12 of 21 cases, and the eval's threshold sweep shows the same accuracy at 0.5 with only 6 Claude calls. If Ollama is down the lead goes to Claude. If Claude is down the local answer stands. Every failure is written to `audit_events`.
+
+Some caveats on that. The eval scores each model once and simulates the cascade from the stored answers, so trying thresholds is free (`python -m eval.run_eval --reuse-claude`). The Claude answers behind these numbers were rebuilt from an earlier run's printout and are marked `reconstructed`. That run didn't record tokens, so there's no measured dollar figure yet; the next paid run logs real token usage. The local model also takes about 4.5 seconds a lead, which adds to the time n8n waits.
 
 **Reproducibility.** The Claude call doesn't set `temperature=0`, and that's on purpose: current models (including the `claude-opus-5` default here) reject sampling parameters, and SDK 1.x's `messages.parse()` doesn't take them. Two things make results repeatable anyway. The tier is computed deterministically from the scores, and a repeated lead returns its stored decision. Re-scoring the same text from scratch can still produce slightly different scores.
 
@@ -165,7 +234,7 @@ This got an actual pass, not just a glance. Here's what came up and what I did a
 - **`GET /leads`'s `limit` is now capped at 500.** It used to be unbounded, which meant any caller could force a much bigger response or table scan than a dashboard, or a person, would ever need.
 - **LLM failures are logged instead of silently swallowed.** The original code had a bare `except Exception: pass` in `agent/scoring.py`, which hid real problems (an expired key, a billing block, an outage) behind what looked like normal heuristic-mode behavior. Now there's a most-specific-first exception chain — auth error, rate limit, API error, connection error, other — and each one gets logged with what actually happened before the code falls back.
 - **Dashboard tooltips build DOM nodes with `textContent`, not `innerHTML`.** Every value in them is server-generated and safe right now, but a tooltip is exactly the kind of place someone adds a raw field later (a company name, a message snippet) without thinking about XSS, so it's written the safe way from the start.
-- **What's intentionally missing:** per-user auth, audit trails beyond the SQLite log, and approval gates before a write action. That's project #09's job in the portfolio, not this one's. The shared secret above is a floor, not a ceiling.
+- **What's intentionally missing:** per-user auth, audit trails beyond the SQLite log, and approval gates before a write action. That belongs in a separate project, not this one. The shared secret above is a floor, not a ceiling.
 
 ## Go-live checklist
 
@@ -174,7 +243,7 @@ Here's the actual short list to point the agent at a real business. None of it t
 1. **Edit `business.yaml`.** Swap in the real business name, the ideal-customer description, the routing rules, and the fallback keyword lists. It's plain YAML with comments explaining each field. `agent/icp.py` loads it at startup, and everything downstream (the LLM prompt, the offline fallback, the dashboard title) picks it up automatically.
 2. **Create three Slack Incoming Webhook URLs** (or fewer, reused). Takes under 2 minutes at [api.slack.com/apps](https://api.slack.com/apps) → your app → Incoming Webhooks → Add New Webhook. Put them in `.env` as `SLACK_WEBHOOK_HOT` / `SLACK_WEBHOOK_WARM` / `SLACK_WEBHOOK_REVIEW` (see `.env.example`).
 3. **Point the real form at the webhook.** Swap out `data/synthetic_leads.py` for whatever the client's actual site or CRM sends, posting to n8n's `/webhook/lead-intake` endpoint.
-4. **Add `ANTHROPIC_API_KEY`** if you want Claude doing the scoring instead of the 71%-accurate heuristic fallback. Real client revenue decisions deserve the real scorer.
+4. **Add `ANTHROPIC_API_KEY`** if you want Claude doing the scoring instead of the 71%-accurate heuristic fallback (Claude scored 90.5% on the same golden set). Real client revenue decisions deserve the real scorer.
 
 Two more things worth doing before this handles real money, even though they won't stop it from running:
 
@@ -187,7 +256,7 @@ Two more things worth doing before this handles real money, even though they won
 business.yaml   the business profile — edit this, not Python, to go live for a new client
 agent/          FastAPI service + LangGraph orchestration + scoring + auth + SQLite store
 data/           synthetic lead generator + hand-labeled golden eval set
-eval/           the eval harness (project #02's philosophy, applied here)
+eval/           the eval harness (every scorer graded on the same hand-labeled set)
 scripts/        seed_history.py — backfills realistic history for the dashboard
 dashboard/      generate_dashboard.py — the actual ROI deliverable
 n8n/            the importable workflow (webhook → agent → real Slack notifications → route)
